@@ -1562,70 +1562,85 @@ class ReportAgent:
             report_id = f"report_{uuid.uuid4().hex[:12]}"
         start_time = datetime.now()
         
-        report = Report(
-            report_id=report_id,
-            simulation_id=self.simulation_id,
-            graph_id=self.graph_id,
-            simulation_requirement=self.simulation_requirement,
-            status=ReportStatus.PENDING,
-            created_at=datetime.now().isoformat()
-        )
+        # 检查是否是恢复运行
+        is_resume = False
+        existing_report = ReportManager.get_report(report_id)
+        if existing_report and existing_report.outline:
+            is_resume = True
+            report = existing_report
+            outline = report.outline
+            report.status = ReportStatus.PENDING
+            logger.info(t('report.resumeReport', reportId=report_id) if "report.resumeReport" in str(t) else f"Resuming report generation for {report_id}")
+        else:
+            report = Report(
+                report_id=report_id,
+                simulation_id=self.simulation_id,
+                graph_id=self.graph_id,
+                simulation_requirement=self.simulation_requirement,
+                status=ReportStatus.PENDING,
+                created_at=datetime.now().isoformat()
+            )
         
         # 已完成的章节标题列表（用于进度追踪）
         completed_section_titles = []
         
         try:
-            # 初始化：创建报告文件夹并保存初始状态
-            ReportManager._ensure_report_folder(report_id)
-            
-            # 初始化日志记录器（结构化日志 agent_log.jsonl）
-            self.report_logger = ReportLogger(report_id)
-            self.report_logger.log_start(
-                simulation_id=self.simulation_id,
-                graph_id=self.graph_id,
-                simulation_requirement=self.simulation_requirement
-            )
-            
-            # 初始化控制台日志记录器（console_log.txt）
-            self.console_logger = ReportConsoleLogger(report_id)
-            
-            ReportManager.update_progress(
-                report_id, "pending", 0, t('progress.initReport'),
-                completed_sections=[]
-            )
-            ReportManager.save_report(report)
-            
-            # 阶段1: 规划大纲
-            report.status = ReportStatus.PLANNING
-            ReportManager.update_progress(
-                report_id, "planning", 5, t('progress.startPlanningOutline'),
-                completed_sections=[]
-            )
-            
-            # 记录规划开始日志
-            self.report_logger.log_planning_start()
-            
-            if progress_callback:
-                progress_callback("planning", 0, t('progress.startPlanningOutline'))
-            
-            outline = self.plan_outline(
-                progress_callback=lambda stage, prog, msg: 
-                    progress_callback(stage, prog // 5, msg) if progress_callback else None
-            )
-            report.outline = outline
-            
-            # 记录规划完成日志
-            self.report_logger.log_planning_complete(outline.to_dict())
-            
-            # 保存大纲到文件
-            ReportManager.save_outline(report_id, outline)
-            ReportManager.update_progress(
-                report_id, "planning", 15, t('progress.outlineDone', count=len(outline.sections)),
-                completed_sections=[]
-            )
-            ReportManager.save_report(report)
-            
-            logger.info(t('report.outlineSavedToFile', reportId=report_id))
+            if not is_resume:
+                # 初始化：创建报告文件夹并保存初始状态
+                ReportManager._ensure_report_folder(report_id)
+                
+                # 初始化日志记录器（结构化日志 agent_log.jsonl）
+                self.report_logger = ReportLogger(report_id)
+                self.report_logger.log_start(
+                    simulation_id=self.simulation_id,
+                    graph_id=self.graph_id,
+                    simulation_requirement=self.simulation_requirement
+                )
+                
+                # 初始化控制台日志记录器（console_log.txt）
+                self.console_logger = ReportConsoleLogger(report_id)
+                
+                ReportManager.update_progress(
+                    report_id, "pending", 0, t('progress.initReport'),
+                    completed_sections=[]
+                )
+                ReportManager.save_report(report)
+                
+                # 阶段1: 规划大纲
+                report.status = ReportStatus.PLANNING
+                ReportManager.update_progress(
+                    report_id, "planning", 5, t('progress.startPlanningOutline'),
+                    completed_sections=[]
+                )
+                
+                # 记录规划开始日志
+                self.report_logger.log_planning_start()
+                
+                if progress_callback:
+                    progress_callback("planning", 0, t('progress.startPlanningOutline'))
+                
+                outline = self.plan_outline(
+                    progress_callback=lambda stage, prog, msg: 
+                        progress_callback(stage, prog // 5, msg) if progress_callback else None
+                )
+                report.outline = outline
+                
+                # 记录规划完成日志
+                self.report_logger.log_planning_complete(outline.to_dict())
+                
+                # 保存大纲到文件
+                ReportManager.save_outline(report_id, outline)
+                ReportManager.update_progress(
+                    report_id, "planning", 15, t('progress.outlineDone', count=len(outline.sections)),
+                    completed_sections=[]
+                )
+                ReportManager.save_report(report)
+                
+                logger.info(t('report.outlineSavedToFile', reportId=report_id))
+            else:
+                # 恢复运行时
+                self.report_logger = ReportLogger(report_id)
+                self.console_logger = ReportConsoleLogger(report_id)
             
             # 阶段2: 逐章节生成（分章节保存）
             report.status = ReportStatus.GENERATING
@@ -1652,6 +1667,37 @@ class ReportAgent:
                         t('progress.generatingSection', title=section.title, current=section_num, total=total_sections)
                     )
                 
+                # 检查是否已有章节存在（恢复模式）
+                if is_resume:
+                    section_path = ReportManager._get_section_path(report_id, section_num)
+                    if os.path.exists(section_path):
+                        logger.info(f"Skipping already generated section {section_num}: {section.title}")
+                        with open(section_path, 'r', encoding='utf-8') as f:
+                            md_content = f.read()
+                            
+                        # 解析出正文内容
+                        lines = md_content.split('\n')
+                        if lines and lines[0].startswith('## '):
+                            content_idx = 1
+                            while content_idx < len(lines) and not lines[content_idx].strip():
+                                content_idx += 1
+                            section.content = '\n'.join(lines[content_idx:])
+                        else:
+                            section.content = md_content
+                            
+                        generated_sections.append(md_content)
+                        completed_section_titles.append(section.title)
+                        
+                        # 更新进度
+                        ReportManager.update_progress(
+                            report_id, "generating", 
+                            base_progress + int(70 / total_sections),
+                            t('progress.sectionDone', title=section.title),
+                            current_section=None,
+                            completed_sections=completed_section_titles
+                        )
+                        continue
+                        
                 # 生成主章节内容
                 section_content = self._generate_section_react(
                     section=section,

@@ -70,6 +70,7 @@ def generate_report():
             }), 404
 
         # 检查是否已有报告
+        report_id = None
         if not force_regenerate:
             existing_report = ReportManager.get_report_by_simulation(simulation_id)
             if existing_report and existing_report.status == ReportStatus.COMPLETED:
@@ -83,6 +84,8 @@ def generate_report():
                         "already_generated": True
                     }
                 })
+            elif existing_report:
+                report_id = existing_report.report_id
         
         # 获取项目信息
         project = ProjectManager.get_project(state.project_id)
@@ -107,8 +110,9 @@ def generate_report():
             }), 400
         
         # 提前生成 report_id，以便立即返回给前端
-        import uuid
-        report_id = f"report_{uuid.uuid4().hex[:12]}"
+        if not report_id:
+            import uuid
+            report_id = f"report_{uuid.uuid4().hex[:12]}"
         
         # 创建异步任务
         task_manager = TaskManager()
