@@ -1,0 +1,79 @@
+{
+  "_description": "All preflight validation rules. Each rule was derived from a specific failure in the Oro Verde S1 simulation run.",
+  "cast_rules": [
+    {
+      "id": "no_generic_nouns",
+      "severity": "FAIL",
+      "description": "No generic nouns as agent names",
+      "oro_verde_example": "senators, cartels, family, woman were all created as agents"
+    },
+    {
+      "id": "no_organizations",
+      "severity": "FAIL",
+      "description": "No organizations as posting agents",
+      "oro_verde_example": "Walmart, criminal empire, DEA became agents"
+    },
+    {
+      "id": "no_dead_characters",
+      "severity": "FAIL",
+      "description": "Dead characters must not be active posting agents",
+      "oro_verde_example": "Carmen (dead) was agent #7 with highest influence_weight"
+    },
+    {
+      "id": "no_duplicates",
+      "severity": "FAIL",
+      "description": "No duplicate agents for the same character",
+      "oro_verde_example": "Javier (agent 9) and Javier Cordero (agent 12) were both created"
+    },
+    {
+      "id": "all_mandatory_present",
+      "severity": "FAIL",
+      "description": "All mandatory characters must have individual agents",
+      "oro_verde_example": "Benjamin, Karla, Isabela, Emilio, Ezequiel, Gabriela, Valeria all missing"
+    }
+  ],
+  "config_rules": [
+    {
+      "id": "message_window_bounded",
+      "severity": "FAIL",
+      "description": "message_window_size must be set and <= 50",
+      "oro_verde_example": "message_window_size=None caused 1M+ token prompts, $3/call, OOM crash"
+    },
+    {
+      "id": "token_limit_bounded",
+      "severity": "FAIL",
+      "description": "token_limit must be set and <= 150000",
+      "oro_verde_example": "Unbounded tokens caused exponential cost growth to $450+"
+    },
+    {
+      "id": "no_chinese_in_config",
+      "severity": "FAIL",
+      "description": "No Chinese characters in config, topics, or narrative direction",
+      "oro_verde_example": "Hot topics, initial posts, narrative direction all generated in Chinese"
+    },
+    {
+      "id": "language_specified",
+      "severity": "FAIL",
+      "description": "Simulation language must be explicitly set",
+      "oro_verde_example": "No language constraint led to Chinese/English/Spanish mix"
+    }
+  ],
+  "document_rules": [
+    {
+      "id": "under_ontology_limit",
+      "severity": "FAIL",
+      "description": "Upload document must be under 50,000 characters",
+      "oro_verde_example": "MiroFish truncates ontology analysis at 50K chars"
+    },
+    {
+      "id": "utf8_encoding",
+      "severity": "FAIL",
+      "description": "Upload document must be UTF-8 encoded"
+    },
+    {
+      "id": "supported_format",
+      "severity": "FAIL",
+      "description": "File format must be PDF, MD, or TXT (no DOCX)"
+    }
+  ]
+}

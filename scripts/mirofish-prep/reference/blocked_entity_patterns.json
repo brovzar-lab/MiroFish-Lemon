@@ -1,0 +1,30 @@
+{
+  "_description": "Entity names and patterns that must NEVER become simulation agents. Derived from Oro Verde S1 post-mortem where 19 of 27 agents were junk.",
+  "generic_nouns": [
+    "senators", "governors", "cartels", "journalists", "activists",
+    "family", "siblings", "grandmother", "grandfather", "woman", "man",
+    "boy", "girl", "child", "teenager", "people", "citizens", "workers",
+    "employees", "lawyers", "doctors", "police", "military", "media",
+    "public", "audience", "investors", "politicians", "officials",
+    "neighbors", "friends", "enemies", "rivals", "allies",
+    "ceos", "directors", "managers", "agents", "officers",
+    "activism", "corruption", "justice", "power"
+  ],
+  "organization_patterns": [
+    "^walmart", "^amazon", "^netflix", "^disney", "^fox", "^hbo",
+    "^dea$", "^fbi$", "^cia$", "^nsa$", "^sec$",
+    "^grupo\\s+", "^el\\s+universal", "^forbes$", "^bloomberg$",
+    "^harvard$", "^yale$", "^stanford$",
+    "criminal\\s+empire", "narco\\s+operation",
+    "serrano\\s+(family|siblings|name)"
+  ],
+  "abstract_concepts": [
+    "activism", "corruption", "justice", "power", "authority",
+    "violence", "narco operation", "criminal empire", "the system"
+  ],
+  "descriptor_patterns": [
+    "^(a|the|an)\\s+",
+    "^\\d+-year-old\\b",
+    "^(young|old|unnamed)\\s+"
+  ]
+}

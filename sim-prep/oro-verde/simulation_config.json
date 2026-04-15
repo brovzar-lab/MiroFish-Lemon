@@ -1,0 +1,330 @@
+{
+  "_generated_by": "mirofish-prep skill — Phase 3 BUILD",
+  "_note": "event_config manually populated per Phase 3 BUILD spec. All other fields from generate_config.py.",
+  "simulation_id": "sim_oroverde_s2_rerun",
+  "project_id": "proj_oroverde_s2",
+  "graph_id": "mirofish_oroverde_s2_001",
+  "simulation_requirement": "Carmen Serrano — the matriarch of a billion-dollar Mexican avocado empire — has died, and in her final week, she removed her three grandchildren from her will. The night of her death, Benjamín Serrano, Karla Serrano, and Isabela Serrano hired Reynaldo to recover the disinheritance document from their family lawyer Ernesto Vega's safe. Ernesto Vega came home. He died accidentally. And facing Don Ezequiel Antona — the criminal operator who co-built the empire with Carmen Serrano — the middle sibling Benjamín Serrano gave a ninety-second speech that was entirely, devastatingly true: the Serrano name is the only thing keeping the operation invisible, and without Benjamín Serrano, Karla Serrano, and Isabela Serrano performing legitimacy, the entire infrastructure collapses. Don Ezequiel Antona accepted the offer. Benjamín Serrano, Karla Serrano, and Isabela Serrano are now the public face of an operation they did not choose, did not know existed, and cannot escape without destroying everything.\n\nThree worlds are now in active collision. The legitimate world — investors, sustainability journalists, multinational buyers, government contacts — sees Grupo Serrano's new leadership and believes the family is clean. The investigation world — journalist Ingrid Cervantes, who knows Ernesto Vega's death was not a burglary, and his grieving son Emilio Vega, who has stayed in Michoacán longer than his return flight — is closing in from the outside without knowing Benjamín Serrano, Karla Serrano, and Isabela Serrano are connected. And the criminal world — Don Ezequiel Antona, his embedded CFO Javier Cordero, and Reynaldo somewhere with a blue folder containing Carmen Serrano's full forty-year archive — is watching every move from the inside.\n\nSimulate how these characters interact, conflict, and collide. Let Benjamín Serrano, Karla Serrano, Isabela Serrano, Don Ezequiel Antona, Javier Cordero, Ingrid Cervantes, Emilio Vega, Lucía Suárez, Valeria Luna, Gabriela Ruiz, Reynaldo, and Padre Mendoza behave from who they are, not from what the story needs them to do. The most interesting questions: What is Javier Cordero actually building on his parallel track? Does Reynaldo ever make contact — and if so, who finds him first? Does the truth about the 2001 plane crash reach Benjamín Serrano, Karla Serrano, and Isabela Serrano before Ingrid Cervantes' investigation does — or at the same moment? Which sibling breaks first, and in which direction? When does Don Ezequiel Antona deploy the Lucía Suárez connection — and what does it destroy?\n\nAt the end of the simulation, generate a report with four sections: 'The Identity Engine' — how the performance evolved or fractured for each of Benjamín Serrano, Karla Serrano, and Isabela Serrano individually. 'The Convergence' — how Ingrid Cervantes and Emilio Vega's external investigations progressed and what they triggered. 'The Ghost of Carmen' — how Carmen Serrano's buried decisions moved through the world via Gabriela Ruiz, Padre Mendoza, the blue folder, and the 1982 photograph. 'The Asymmetry' — how Don Ezequiel Antona's control held or cracked, what Javier Cordero built in the shadows, and whether Reynaldo was ever activated. Include the simulation's own emergent surprises — alliances, betrayals, and revelations that were not predictable from the starting positions.",
+  "time_config": {
+    "total_simulation_hours": 168,
+    "minutes_per_round": 60,
+    "agents_per_hour_min": 3,
+    "agents_per_hour_max": 12,
+    "peak_hours": [20, 21, 22, 23],
+    "peak_activity_multiplier": 1.5,
+    "off_peak_hours": [0, 1, 2, 3, 4, 5],
+    "off_peak_activity_multiplier": 0.05,
+    "morning_hours": [6, 7, 8],
+    "morning_activity_multiplier": 0.4,
+    "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+    "work_activity_multiplier": 0.7
+  },
+  "agent_configs": [
+    {
+      "agent_id": 0,
+      "entity_name": "Benjamín Serrano",
+      "entity_type": "Person",
+      "activity_level": 0.6,
+      "posts_per_hour": 0.5,
+      "comments_per_hour": 1.0,
+      "active_hours": [9, 10, 11, 12, 14, 15, 16, 17, 19, 20],
+      "response_delay_min": 15,
+      "response_delay_max": 60,
+      "sentiment_bias": 0.2,
+      "stance": "protagonist",
+      "influence_weight": 2.5
+    },
+    {
+      "agent_id": 1,
+      "entity_name": "Karla Serrano",
+      "entity_type": "Person",
+      "activity_level": 0.5,
+      "posts_per_hour": 0.3,
+      "comments_per_hour": 0.8,
+      "active_hours": [7, 8, 9, 10, 11, 14, 15, 16, 17, 18],
+      "response_delay_min": 10,
+      "response_delay_max": 45,
+      "sentiment_bias": -0.1,
+      "stance": "protagonist",
+      "influence_weight": 2.0
+    },
+    {
+      "agent_id": 2,
+      "entity_name": "Isabela Serrano",
+      "entity_type": "Person",
+      "activity_level": 0.5,
+      "posts_per_hour": 0.4,
+      "comments_per_hour": 0.6,
+      "active_hours": [10, 11, 14, 15, 19, 20, 21, 22, 23],
+      "response_delay_min": 10,
+      "response_delay_max": 60,
+      "sentiment_bias": 0.1,
+      "stance": "protagonist",
+      "influence_weight": 1.6
+    },
+    {
+      "agent_id": 3,
+      "entity_name": "Don Ezequiel Antona",
+      "entity_type": "Person",
+      "activity_level": 0.3,
+      "posts_per_hour": 0.1,
+      "comments_per_hour": 0.2,
+      "active_hours": [10, 11, 20, 21, 22, 23],
+      "response_delay_min": 60,
+      "response_delay_max": 300,
+      "sentiment_bias": -0.5,
+      "stance": "antagonist",
+      "influence_weight": 3.0
+    },
+    {
+      "agent_id": 4,
+      "entity_name": "Javier Cordero",
+      "entity_type": "Person",
+      "activity_level": 0.5,
+      "posts_per_hour": 0.4,
+      "comments_per_hour": 0.6,
+      "active_hours": [9, 10, 11, 14, 15, 16, 19, 20, 21],
+      "response_delay_min": 30,
+      "response_delay_max": 120,
+      "sentiment_bias": 0.4,
+      "stance": "antagonist",
+      "influence_weight": 2.0
+    },
+    {
+      "agent_id": 5,
+      "entity_name": "Ingrid Cervantes",
+      "entity_type": "Person",
+      "activity_level": 0.8,
+      "posts_per_hour": 1.2,
+      "comments_per_hour": 2.5,
+      "active_hours": [8, 9, 10, 11, 14, 15, 16, 19, 20, 21, 22],
+      "response_delay_min": 5,
+      "response_delay_max": 25,
+      "sentiment_bias": -0.3,
+      "stance": "opposing",
+      "influence_weight": 2.2
+    },
+    {
+      "agent_id": 6,
+      "entity_name": "Emilio Vega",
+      "entity_type": "Person",
+      "activity_level": 0.5,
+      "posts_per_hour": 0.3,
+      "comments_per_hour": 0.5,
+      "active_hours": [9, 10, 11, 14, 15, 16, 19, 20, 21],
+      "response_delay_min": 10,
+      "response_delay_max": 45,
+      "sentiment_bias": -0.2,
+      "stance": "opposing",
+      "influence_weight": 1.8
+    },
+    {
+      "agent_id": 7,
+      "entity_name": "Lucía Suárez",
+      "entity_type": "Person",
+      "activity_level": 0.7,
+      "posts_per_hour": 0.4,
+      "comments_per_hour": 0.6,
+      "active_hours": [8, 9, 12, 13, 18, 19, 20, 21, 22],
+      "response_delay_min": 3,
+      "response_delay_max": 25,
+      "sentiment_bias": 0.4,
+      "stance": "opposing",
+      "influence_weight": 1.6
+    },
+    {
+      "agent_id": 8,
+      "entity_name": "Valeria Luna",
+      "entity_type": "Person",
+      "activity_level": 0.4,
+      "posts_per_hour": 0.2,
+      "comments_per_hour": 0.4,
+      "active_hours": [9, 10, 11, 14, 15, 16, 19, 20],
+      "response_delay_min": 30,
+      "response_delay_max": 120,
+      "sentiment_bias": 0.0,
+      "stance": "neutral",
+      "influence_weight": 1.4
+    },
+    {
+      "agent_id": 9,
+      "entity_name": "Gabriela Ruiz",
+      "entity_type": "Person",
+      "activity_level": 0.3,
+      "posts_per_hour": 0.1,
+      "comments_per_hour": 0.2,
+      "active_hours": [7, 8, 9, 10, 11, 17, 18, 19],
+      "response_delay_min": 60,
+      "response_delay_max": 240,
+      "sentiment_bias": -0.1,
+      "stance": "neutral",
+      "influence_weight": 1.5
+    },
+    {
+      "agent_id": 10,
+      "entity_name": "Reynaldo",
+      "entity_type": "Person",
+      "activity_level": 0.15,
+      "posts_per_hour": 0.05,
+      "comments_per_hour": 0.1,
+      "active_hours": [14, 15, 16, 21, 22, 23],
+      "response_delay_min": 180,
+      "response_delay_max": 600,
+      "sentiment_bias": -0.7,
+      "stance": "neutral",
+      "influence_weight": 0.9
+    },
+    {
+      "agent_id": 11,
+      "entity_name": "Padre Mendoza",
+      "entity_type": "Person",
+      "activity_level": 0.2,
+      "posts_per_hour": 0.1,
+      "comments_per_hour": 0.1,
+      "active_hours": [8, 9, 10, 11, 17, 18, 19],
+      "response_delay_min": 120,
+      "response_delay_max": 480,
+      "sentiment_bias": 0.3,
+      "stance": "neutral",
+      "influence_weight": 1.8
+    }
+  ],
+  "event_config": {
+    "initial_posts": [
+      {
+        "agent": "Benjamín Serrano",
+        "platform": "twitter",
+        "hour": 1,
+        "content": "Grupo Serrano honors the legacy of Carmen Serrano with renewed commitment to every community we serve. The work continues. The name endures. #GrupoSerrano #Michoacán"
+      },
+      {
+        "agent": "Ingrid Cervantes",
+        "platform": "twitter",
+        "hour": 2,
+        "content": "The death of attorney Ernesto Vega, 40-year counsel to the Serrano family, is being investigated as a homicide. A specialist safe was accessed. Nothing else was taken. Sources inside the prosecutor's office confirm: this was not a burglary."
+      },
+      {
+        "agent": "Lucía Suárez",
+        "platform": "twitter",
+        "hour": 3,
+        "content": "Carmen Serrano is gone. Grupo Serrano's new leadership promises continuity. The Río Cupatitzio doesn't care about continuity. It's running 40% below its 2019 level. The avocado groves that replaced the forest don't mourn. They just keep taking."
+      },
+      {
+        "agent": "Javier Cordero",
+        "platform": "twitter",
+        "hour": 4,
+        "content": "Grupo Serrano Q1 numbers: distribution volume up 12%, sustainability certification renewed for the third consecutive year, community investment fund fully capitalized. The transition is orderly. The fundamentals are sound."
+      },
+      {
+        "agent": "Isabela Serrano",
+        "platform": "twitter",
+        "hour": 6,
+        "content": "She smelled like gardenias and never explained anything. Not once. I keep finding things in this house I don't know how to ask about. Abuela, what were you building?"
+      },
+      {
+        "agent": "Emilio Vega",
+        "platform": "reddit",
+        "hour": 8,
+        "content": "Arrived in Michoacán to settle my father's estate. He was a lawyer here for forty years. Spotless record. The police say it was a robbery but only one thing was taken — a single folder from a safe that required a combination. My father never wrote that combination down. Whoever opened that safe knew it. I'm staying until I understand why."
+      },
+      {
+        "agent": "Karla Serrano",
+        "platform": "twitter",
+        "hour": 10,
+        "content": "Grupo Serrano's board convenes Tuesday. The agenda is operational continuity and the community investment program Carmen Serrano began in 2019. We are not going anywhere."
+      },
+      {
+        "agent": "Gabriela Ruiz",
+        "platform": "reddit",
+        "hour": 12,
+        "content": "Forty years in a house and you learn what silence means. Every family has rooms nobody talks about. The Serrano hacienda has whole floors."
+      }
+    ],
+    "scheduled_events": [
+      {
+        "hour": 24,
+        "trigger": "Valeria Luna arrives at the Hacienda with the infant son",
+        "agents_aware": ["Benjamín Serrano", "Karla Serrano", "Isabela Serrano", "Gabriela Ruiz"],
+        "description": "Valeria Luna's arrival at the Hacienda. She begins reading the room — the unfamiliar men, the tension in Gabriela Ruiz's posture, the way Benjamín Serrano holds her slightly too long at the door."
+      },
+      {
+        "hour": 36,
+        "trigger": "Emilio Vega visits his father's house and talks to neighbors",
+        "agents_aware": ["Emilio Vega"],
+        "description": "Emilio Vega's informal investigation deepens. He begins asking questions that seem like grief and are becoming something else. Ingrid Cervantes becomes aware there is another investigator in Michoacán."
+      },
+      {
+        "hour": 48,
+        "trigger": "Ingrid Cervantes publishes preliminary article on Ernesto Vega's death",
+        "agents_aware": ["Ingrid Cervantes", "Benjamín Serrano", "Karla Serrano", "Javier Cordero", "Don Ezequiel Antona"],
+        "description": "Ingrid Cervantes publishes the first public piece questioning the burglary narrative. Benjamín Serrano's legal response — or lack of one — becomes visible to other characters."
+      },
+      {
+        "hour": 72,
+        "trigger": "Isabela Serrano finds additional evidence in the hacienda archive",
+        "agents_aware": ["Isabela Serrano"],
+        "description": "Isabela Serrano continues her private investigation of Carmen Serrano's documents. The 1982 photograph connects to a name or date that advances her understanding of what Don Ezequiel Antona's initials meant."
+      },
+      {
+        "hour": 96,
+        "trigger": "Don Ezequiel Antona's first direct test of the siblings' public performance",
+        "agents_aware": ["Don Ezequiel Antona", "Javier Cordero", "Benjamín Serrano", "Karla Serrano"],
+        "description": "Don Ezequiel Antona initiates a high-visibility obligation — a meeting with a state official, a public appearance — that requires Benjamín Serrano and Karla Serrano to perform credibly under pressure. The test of whether the arrangement holds."
+      },
+      {
+        "hour": 120,
+        "trigger": "Ingrid Cervantes and Emilio Vega make contact",
+        "agents_aware": ["Ingrid Cervantes", "Emilio Vega"],
+        "description": "The two investigators realize they are working the same case from different angles. Their combined knowledge begins closing the distance toward the Serrano siblings."
+      },
+      {
+        "hour": 144,
+        "trigger": "Midpoint pressure — plane crash truth approaches surface",
+        "agents_aware": ["Gabriela Ruiz", "Padre Mendoza"],
+        "description": "Gabriela Ruiz and Padre Mendoza feel the increasing proximity of the investigators. One of them moves toward disclosure — or one is approached directly. The truth about the 2001 plane crash begins to circulate."
+      }
+    ],
+    "hot_topics": [
+      "Serrano family legitimacy crisis",
+      "avocado empire criminal investigation",
+      "blue folder missing archive",
+      "Ernesto Vega death not burglary",
+      "Grupo Serrano environmental destruction",
+      "Michoacán water rights avocado",
+      "organized crime agricultural supply chain",
+      "Serrano siblings inheritance dispute",
+      "investigative journalism corruption Mexico",
+      "identity performance vs reality",
+      "cartel front company exposed",
+      "generational family secrets"
+    ],
+    "narrative_direction": "Track three converging pressure lines simultaneously. Line A — THE PERFORMANCE: How long can Benjamín Serrano, Karla Serrano, and Isabela Serrano maintain Grupo Serrano's public legitimacy while learning the operational mechanics of what the company actually does? Every day they perform legitimacy, they become more complicit. Every day they do not escape, the exit becomes smaller. Line B — THE INVESTIGATION FROM OUTSIDE: Emilio Vega and Ingrid Cervantes are converging from outside toward the truth about Ernesto Vega's death. Emilio Vega's developing dynamic with Isabela Serrano creates the most acute danger — the two investigations are moving toward the same center, and the people conducting them are developing feelings neither of them can name. Line C — THE LOOSE END: Reynaldo is somewhere with the blue folder. Nobody knows where. Nobody knows what he has read. Every decision the siblings make carries the shadow of this unknown. The loose end is the season's structural clock. Priority tracking: (1) which sibling shows the first visible crack in the performance, (2) at what point Ingrid Cervantes crosses from background risk to active present threat, (3) whether Javier Cordero's parallel activity becomes visible to the principals before he is ready, (4) whether Don Ezequiel Antona deploys the Lucía Suárez family connection — and when."
+  },
+  "twitter_config": {
+    "platform": "twitter",
+    "recency_weight": 0.4,
+    "popularity_weight": 0.3,
+    "relevance_weight": 0.3,
+    "viral_threshold": 10,
+    "echo_chamber_strength": 0.5
+  },
+  "reddit_config": {
+    "platform": "reddit",
+    "recency_weight": 0.3,
+    "popularity_weight": 0.4,
+    "relevance_weight": 0.3,
+    "viral_threshold": 15,
+    "echo_chamber_strength": 0.6
+  },
+  "llm_model": "claude-sonnet-4-6",
+  "llm_base_url": "http://172.17.0.1:4000/v1",
+  "language": "es",
+  "cost_controls": {
+    "message_window_size": 50,
+    "token_limit": 150000,
+    "max_cost_per_round_usd": 0.50,
+    "alert_cost_per_call_usd": 1.00
+  },
+  "generated_at": "2026-04-15T01:02:00-06:00",
+  "generated_by": "mirofish-prep skill — Phase 3 BUILD"
+}

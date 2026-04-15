@@ -38,7 +38,17 @@ def create_app(config_class=Config):
         logger.info("=" * 50)
         logger.info("MiroFish Backend 启动中...")
         logger.info("=" * 50)
-    
+
+    # 异步检查 API credits（不阻塞启动）
+    import threading
+    def _run_credit_check():
+        try:
+            from .utils.credit_check import check_openrouter_credits
+            check_openrouter_credits()
+        except Exception as e:
+            get_logger('mirofish').warning(f"Credit check error: {e}")
+    threading.Thread(target=_run_credit_check, daemon=True).start()
+
     # 启用CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
@@ -63,10 +73,11 @@ def create_app(config_class=Config):
         return response
     
     # 注册蓝图
-    from .api import graph_bp, simulation_bp, report_bp
+    from .api import graph_bp, simulation_bp, report_bp, prep_bp
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
+    app.register_blueprint(prep_bp, url_prefix='/api/prep')
     
     # 健康检查
     @app.route('/health')

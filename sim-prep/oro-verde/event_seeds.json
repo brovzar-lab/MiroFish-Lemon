@@ -1,0 +1,111 @@
+{
+  "_generated_by": "mirofish-prep skill — Phase 3 BUILD",
+  "_description": "Key narrative beats seeded as scheduled events. Each entry specifies the trigger hour, the initiating character, and the information state change. These are inflection points, not scripted outcomes — the simulation should produce its own consequences from each trigger.",
+  "event_seeds": [
+    {
+      "id": "EVT_001",
+      "hour": 1,
+      "name": "The Performance Begins",
+      "trigger_agent": "Benjamín Serrano",
+      "description": "Benjamín Serrano makes his first public statement as the new face of Grupo Serrano. The performance of legitimacy has officially started. The gap between what he says and what he knows begins accumulating immediately.",
+      "information_change": {
+        "public_world": "Grupo Serrano's leadership transition appears orderly and confident.",
+        "Benjamín Serrano": "Knows the speech is a performance. Knows what it cost. Does not yet know how to stop."
+      },
+      "narrative_purpose": "Establishes the baseline of the Legitimacy Garment at its cleanest — before it begins to tear."
+    },
+    {
+      "id": "EVT_002",
+      "hour": 24,
+      "name": "Valeria Luna Arrives",
+      "trigger_agent": "Valeria Luna",
+      "description": "Valeria Luna arrives at the Hacienda with the infant son. She walks in with less information than anyone in the building and the best instincts. She begins reading the room immediately: the unfamiliar men, the tension in Gabriela Ruiz's posture, the way Benjamín Serrano holds her slightly too long at the door.",
+      "information_change": {
+        "Valeria Luna": "No explicit knowledge. High suspicion. Beginning to assemble an incomplete picture.",
+        "Benjamín Serrano": "Now managing Don Ezequiel Antona's world AND the domestic world simultaneously. Two performances running in the same building.",
+        "Lucía Suárez": "Valeria Luna's arrival makes Lucía Suárez effectively impossible for Benjamín Serrano to pursue."
+      },
+      "narrative_purpose": "Benjamín Serrano's romantic triangle collapses into the same physical space as his criminal entrapment. The cost of the performance becomes visible and personal."
+    },
+    {
+      "id": "EVT_003",
+      "hour": 36,
+      "name": "Emilio Vega Begins Asking Questions",
+      "trigger_agent": "Emilio Vega",
+      "description": "Emilio Vega visits Ernesto Vega's house, talks to neighbors, begins asking questions that seem like grief. His investigation is almost accidental at this point — a 9w8 who is not yet aware his dormant 8 wing is waking up. He notes that the intermediary who arranged the entry to the safe has disappeared. He does not yet know the Serrano siblings' connection.",
+      "information_change": {
+        "Emilio Vega": "Confirms the safe required a combination. Confirms only one folder was taken. Now has a question he cannot close.",
+        "Ingrid Cervantes": "Becomes aware there is another investigator in Michoacán pursuing the same case."
+      },
+      "narrative_purpose": "Second pressure line activates. The investigation from outside gains its second vector."
+    },
+    {
+      "id": "EVT_004",
+      "hour": 48,
+      "name": "Ingrid Cervantes Publishes",
+      "trigger_agent": "Ingrid Cervantes",
+      "description": "Ingrid Cervantes publishes her first substantial piece on Ernesto Vega's death — establishing the burglary narrative as false, documenting that only a specialist safe was accessed, noting that the safe required a combination that was not written down anywhere. She does not yet name suspects. The article reaches Karla Serrano first.",
+      "information_change": {
+        "public_world": "Ernesto Vega's death is now publicly framed as a targeted killing, not a burglary.",
+        "Karla Serrano": "Ingrid Cervantes has now crossed from personal contact into active professional threat. The investigation and the relationship are the same bomb.",
+        "Benjamín Serrano": "Now needs to decide whether to respond legally, strategically, or not at all.",
+        "Javier Cordero": "Immediately reports the article's implications to Don Ezequiel Antona.",
+        "Don Ezequiel Antona": "The external investigation is now public. His leash on the siblings — their guilt about Ernesto Vega — is now under pressure."
+      },
+      "narrative_purpose": "The first external crack in the Legitimacy Garment. The investigation is now visible to everyone."
+    },
+    {
+      "id": "EVT_005",
+      "hour": 72,
+      "name": "Isabela Serrano Finds the Second Thread",
+      "trigger_agent": "Isabela Serrano",
+      "description": "Isabela Serrano continues her private investigation of Carmen Serrano's documents in the hacienda. She connects the initials 'CS y EA' on the 1982 photograph to Ezequiel Antona — a name she now has a face for, a face that was sitting in her grandmother's chair. The ledger entries from the 1980s predate every official account of Grupo Serrano's legitimacy by decades. She is the only sibling moving toward the truth. She still tells no one.",
+      "information_change": {
+        "Isabela Serrano": "Now knows: Carmen Serrano and Don Ezequiel Antona were partners from at least 1982 — long before any of the grandchildren were told the business was legal. The lie is older than all of them.",
+        "Benjamín Serrano": "Does not know. Still operating on the assumption the arrangement began after Carmen Serrano's death.",
+        "Karla Serrano": "Does not know."
+      },
+      "narrative_purpose": "Isabela Serrano advances on the inside while the outside closes in. She is the only character who could synthesize both lines of investigation — if she ever chooses to."
+    },
+    {
+      "id": "EVT_006",
+      "hour": 96,
+      "name": "Don Ezequiel Antona Tests the Performance",
+      "trigger_agent": "Don Ezequiel Antona",
+      "description": "Don Ezequiel Antona engineering a high-visibility obligation — a meeting with a state agricultural official, a public appearance at a port inspection, a dinner with investors — that requires Benjamín Serrano and Karla Serrano to perform credibly under the most pressure they have yet faced. Javier Cordero is present, watching.",
+      "information_change": {
+        "Don Ezequiel Antona": "First objective data point on whether the siblings can actually deliver what Benjamín Serrano promised.",
+        "Javier Cordero": "Watching to see if Benjamín Serrano's performance holds — and filing everything.",
+        "Benjamín Serrano": "The performance is now being graded in real time by the man who will end them if they fail.",
+        "Karla Serrano": "Managing the appearance of competence while knowing Ingrid Cervantes published a piece that is slowly naming them."
+      },
+      "narrative_purpose": "The Legitimacy Garment under its first direct stress test. Whether it holds — and at what cost — determines the trajectory of the second half."
+    },
+    {
+      "id": "EVT_007",
+      "hour": 120,
+      "name": "The Two Investigations Converge",
+      "trigger_agent": "Ingrid Cervantes",
+      "description": "Ingrid Cervantes and Emilio Vega make contact — they realize they are working the same case from opposite angles. Ingrid Cervantes has the forensic thread (the safe combination, the source inside the state police). Emilio Vega has the personal thread (the intermediary chain, the fact that the timing aligns with Carmen Serrano's final days). Together their knowledge begins closing the distance toward Benjamín Serrano, Karla Serrano, and Isabela Serrano.",
+      "information_change": {
+        "Ingrid Cervantes": "Now knows about the intermediary. The case is no longer just about how the safe was opened — it is about who commissioned the entry.",
+        "Emilio Vega": "Now has a journalist with a source inside the state police. His grief investigation has become something with publication attached.",
+        "Karla Serrano": "Does not know Ingrid Cervantes and Emilio Vega have made contact. The person she is closest to is now in direct cooperation with the person who lost the most."
+      },
+      "narrative_purpose": "The external investigation achieves critical mass. Two vectors become one convergent threat."
+    },
+    {
+      "id": "EVT_008",
+      "hour": 144,
+      "name": "The Ghost of Carmen Approaches the Surface",
+      "trigger_agent": "Gabriela Ruiz",
+      "description": "As the investigations close in, Gabriela Ruiz and Padre Mendoza feel the proximity. One of them — or both — reaches a threshold of conscience. The truth about the 2001 plane crash (that it was a message from a rival group, that Carmen Serrano knew within days, that she kept building and kept silent for twenty-three years) begins moving toward the surface. Whether through a deliberate disclosure or a crack in the silence is left for the simulation to determine.",
+      "information_change": {
+        "Gabriela Ruiz": "The weight she has been carrying alone since Carmen Serrano told her begins to become unsustainable.",
+        "Padre Mendoza": "The confessional knowledge and the present emergency converge.",
+        "Benjamín Serrano / Karla Serrano / Isabela Serrano": "Do not yet know. But proximity to the truth is measurable."
+      },
+      "narrative_purpose": "The season's midpoint detonation approaches. The revelation that their parents did not die in an accident — and that Carmen Serrano knew — is the event that rewrites the grief all three siblings have carried since childhood."
+    }
+  ]
+}
