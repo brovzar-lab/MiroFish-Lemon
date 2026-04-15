@@ -16,11 +16,11 @@
         <div class="session-strip">
           <div class="session-stat">
             <div class="session-label">PROJECT</div>
-            <div class="session-value mono">{{ projectName }}</div>
+            <div class="session-value mono">{{ activeProject || '—' }}</div>
           </div>
           <div class="session-stat">
-            <div class="session-label">WORDS INGESTED</div>
-            <div class="session-value mono">{{ totalWords.toLocaleString() }}</div>
+            <div class="session-label">SOURCES</div>
+            <div class="session-value mono">{{ loadedDocCount }}/3</div>
           </div>
           <div class="session-stat">
             <div class="session-label">CAST AGENTS</div>
@@ -61,27 +61,96 @@
         <!-- LEFT PAGE -->
         <div class="page page-left">
 
+          <!-- PHASE 00: PROJECT -->
+          <section v-show="activePhase === 'project'" class="section-card">
+            <div class="section-heading-row">
+              <div>
+                <div class="eyebrow mono">PHASE 00 / PROJECT</div>
+                <div class="section-title serif">Pick an existing project or create a new one.</div>
+              </div>
+              <div class="doc-state mono" :class="{ ready: !!activeProject }">
+                {{ activeProject ? `active: ${activeProject}` : 'no project selected' }}
+              </div>
+            </div>
+            <p class="section-copy">Each project gets its own folder under <code>sim-prep/&lt;slug&gt;/</code> with separate sources, drafts, and promoted artifacts.</p>
+
+            <div v-if="projectsLoading" class="loading-state mono">Loading projects…</div>
+            <div v-else-if="projectError" class="error-state mono">{{ projectError }}</div>
+            <div v-else>
+              <div class="project-grid">
+                <div
+                  v-for="p in projects"
+                  :key="p.slug"
+                  class="project-card"
+                  :class="{ active: activeProject === p.slug }"
+                  @click="selectProject(p.slug)"
+                >
+                  <div class="project-name serif">{{ p.name }}</div>
+                  <div class="project-slug mono">{{ p.slug }}</div>
+                  <div class="project-meta mono">
+                    <span v-if="p.has_cast" class="pm-pill pm-on">cast</span>
+                    <span v-if="p.has_upload_doc" class="pm-pill pm-on">upload</span>
+                    <span v-if="p.has_reality_seed" class="pm-pill pm-on">seed</span>
+                    <span v-if="p.has_config" class="pm-pill pm-on">config</span>
+                    <span v-if="p.has_event_seeds" class="pm-pill pm-on">events</span>
+                    <span v-if="p.source_count" class="pm-pill">{{ p.source_count }} src</span>
+                  </div>
+                </div>
+                <div class="project-card new" @click="$refs.newProjectInput.focus()">
+                  <div class="project-new-label mono">+ New project</div>
+                  <input
+                    ref="newProjectInput"
+                    v-model="newProjectName"
+                    class="project-new-input mono"
+                    placeholder="e.g. Oro Verde S2"
+                    @keyup.enter="createProject"
+                    @click.stop
+                  />
+                  <button
+                    class="action-btn secondary sm"
+                    :disabled="!newProjectName.trim() || creatingProject"
+                    @click.stop="createProject"
+                  >
+                    {{ creatingProject ? 'creating…' : 'create' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="action-btn primary"
+              :disabled="!activeProject"
+              @click="activePhase = 'ingest'"
+            >
+              Advance to INGEST →
+            </button>
+          </section>
+
           <!-- PHASE 01: INGEST -->
           <section v-show="activePhase === 'ingest'" class="section-card">
             <div class="section-heading-row">
               <div>
                 <div class="eyebrow mono">PHASE 01 / INGEST</div>
-                <div class="section-title serif">Source documents laid out like working pages.</div>
+                <div class="section-title serif">Source documents for AI to read.</div>
               </div>
-              <div class="doc-state mono" :class="{ ready: allDocsLoaded }">
-                <svg v-if="allDocsLoaded" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="doc-state mono" :class="{ ready: anyDocLoaded }">
+                <svg v-if="anyDocLoaded" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                {{ allDocsLoaded ? 'all imports clean' : `${loadedDocCount}/5 loaded` }}
+                {{ loadedDocCount }}/3 loaded
               </div>
             </div>
-            <p class="section-copy">Drop each source document into its tile. The studio will parse word count, check character limits, and flag any encoding issues before advancing to CAST.</p>
+            <p class="section-copy">Drop 1-3 raw source documents (script, bible, treatment — PDF, MD, or TXT). Server-side text extraction handles PDFs. AI will read these in the next phase to extract the character cast.</p>
 
-            <div class="doc-grid">
+            <div v-if="!activeProject" class="error-state mono">
+              Select a project first (Phase 00).
+            </div>
+
+            <div class="doc-grid three-col" v-else>
               <div
                 v-for="doc in docs"
                 :key="doc.id"
                 class="doc-card"
-                :class="{ wide: doc.wide, loaded: doc.loaded, dragging: doc.dragging }"
+                :class="{ loaded: doc.loaded, dragging: doc.dragging, uploading: doc.uploading, errored: !!doc.error }"
                 @dragover.prevent="doc.dragging = true"
                 @dragleave="doc.dragging = false"
                 @drop.prevent="onFileDrop($event, doc)"
@@ -93,18 +162,20 @@
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
                     <div class="doc-state-pill" :class="{ loaded: doc.loaded }">
-                      <svg v-if="doc.loaded" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      <svg v-if="doc.uploading" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/></svg>
+                      <svg v-else-if="doc.loaded" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                       <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      {{ doc.loaded ? 'loaded' : 'empty' }}
+                      {{ doc.uploading ? 'uploading' : (doc.loaded ? 'loaded' : 'empty') }}
                     </div>
                   </div>
                   <div class="doc-title">{{ doc.label }}</div>
                   <div class="drop-zone mono">{{ doc.loaded ? doc.filename : doc.hint }}</div>
+                  <div v-if="doc.error" class="doc-error mono">{{ doc.error }}</div>
                 </div>
                 <div class="doc-footer">
                   <div class="filename-badge mono" v-if="doc.loaded">{{ doc.filename }}</div>
                   <div class="filename-badge mono empty" v-else>Drop file or click</div>
-                  <div class="count-badge mono" v-if="doc.loaded">{{ doc.wordCount.toLocaleString() }} words</div>
+                  <div class="count-badge mono" v-if="doc.loaded">{{ doc.charCount.toLocaleString() }} chars</div>
                 </div>
                 <input
                   :ref="'fileInput_' + doc.id"
@@ -116,13 +187,27 @@
               </div>
             </div>
 
-            <button
-              class="action-btn primary"
-              :disabled="!allDocsLoaded"
-              @click="activePhase = 'cast'"
-            >
-              Advance to CAST →
-            </button>
+            <div v-if="analyzeResult" class="analyze-panel mono">
+              <div class="eyebrow mono">DOCUMENT ANALYSIS</div>
+              <pre class="analyze-json">{{ JSON.stringify(analyzeResult, null, 2).slice(0, 2000) }}</pre>
+            </div>
+
+            <div class="action-row">
+              <button
+                class="action-btn secondary"
+                :disabled="!anyDocLoaded || analyzing"
+                @click="analyzeSources"
+              >
+                {{ analyzing ? 'Analyzing…' : 'Analyze documents' }}
+              </button>
+              <button
+                class="action-btn primary"
+                :disabled="!anyDocLoaded"
+                @click="activePhase = 'cast'"
+              >
+                Advance to CAST →
+              </button>
+            </div>
           </section>
 
           <!-- PHASE 02: CAST -->
@@ -130,9 +215,68 @@
             <div class="section-heading-row">
               <div>
                 <div class="eyebrow mono">PHASE 02 / CAST</div>
-                <div class="section-title serif">Character cards arranged like casting notes on a desk.</div>
+                <div class="section-title serif">AI extracts characters from your sources.</div>
               </div>
               <div class="toolbar-chip mono">{{ activeAgentCount }} agents active</div>
+            </div>
+
+            <!-- AI extraction panel -->
+            <div class="ai-panel">
+              <div class="ai-panel-top">
+                <div>
+                  <div class="eyebrow mono">AI CHARACTER EXTRACTION</div>
+                  <p class="section-copy" style="margin-top:4px;">
+                    Reads your source documents, extracts every named character, applies validation-in-loop
+                    (blocks generic nouns, organizations, dead-as-active, group agents), retries up to 2× on failure.
+                  </p>
+                </div>
+                <button
+                  class="action-btn primary"
+                  :disabled="aiCastExtracting || !activeProject"
+                  @click="extractCastViaAI"
+                >
+                  {{ aiCastExtracting ? 'Extracting…' : (cast.length ? 'Re-extract' : 'Extract characters') }}
+                </button>
+              </div>
+
+              <div v-if="aiCastExtracting" class="loading-state mono">
+                AI is reading your materials and extracting characters…
+              </div>
+
+              <div v-if="aiCastResult" class="ai-result mono">
+                <div class="ai-result-row">
+                  <span class="session-label">AGENTS EXTRACTED</span>
+                  <span class="session-value">{{ aiCastResult.agent_count }}</span>
+                </div>
+                <div class="ai-result-row" v-if="aiCastResult.validation">
+                  <span class="session-label">VALIDATION</span>
+                  <span class="session-value" :style="{ color: aiCastResult.validation.failures === 0 ? 'var(--success)' : 'var(--destructive)' }">
+                    {{ aiCastResult.validation.failures }} failures · {{ aiCastResult.validation.warnings }} warnings
+                  </span>
+                </div>
+                <div v-if="aiCastResult.cast?._validation_warnings" class="ai-warning mono">
+                  ⚠ {{ aiCastResult.cast._validation_warnings }}
+                </div>
+                <div v-if="aiCastResult.validation?.checks?.length" class="ai-checks">
+                  <div
+                    v-for="(chk, i) in aiCastResult.validation.checks.filter(c => c.status !== 'PASS')"
+                    :key="i"
+                    class="ai-check-row"
+                    :class="chk.status.toLowerCase()"
+                  >
+                    [{{ chk.status }}] {{ chk.rule }}: {{ chk.message }}
+                  </div>
+                </div>
+                <button
+                  v-if="aiCastResult.ready_to_promote"
+                  class="action-btn primary sm"
+                  :disabled="castPromoting"
+                  style="margin-top:10px;"
+                  @click="promoteCast"
+                >
+                  {{ castPromoting ? 'promoting…' : 'Promote to canonical character_cast.json' }}
+                </button>
+              </div>
             </div>
 
             <div v-if="castLoading" class="loading-state mono">Loading cast from character_cast.json…</div>
@@ -206,10 +350,16 @@
             <div class="section-heading-row">
               <div>
                 <div class="eyebrow mono">PHASE 03 / BUILD</div>
-                <div class="section-title serif">Live draft on the left, package outputs stacked right.</div>
+                <div class="section-title serif">AI generates each artifact. Promote when ready.</div>
               </div>
-              <div class="toolbar-chip mono">{{ buildRunning ? 'generating…' : 'ready to build' }}</div>
+              <div class="toolbar-chip mono">{{ allArtifactsPromoted ? 'all promoted' : 'in progress' }}</div>
             </div>
+
+            <p class="section-copy">
+              Each artifact is generated by AI into a <code>_draft/</code> file, then reviewed and promoted to canonical.
+              Canonical files are what MiroFish receives. <strong>character_cast.json must be promoted first</strong>
+              (it's the input to the other generators).
+            </p>
 
             <div class="build-split">
               <!-- markdown preview -->
@@ -221,44 +371,56 @@
                 <div class="markdown-block mono" v-if="uploadDocPreview">
                   <div v-for="(line, i) in previewLines" :key="i" :class="{ 'markdown-line': line.startsWith('##') || line.startsWith('**') }">{{ line || '&nbsp;' }}</div>
                 </div>
-                <div class="empty-preview mono" v-else>Run BUILD to generate upload_document.md preview…</div>
+                <div class="empty-preview mono" v-else>Generate upload_document.md to preview…</div>
               </div>
 
-              <!-- output cards -->
+              <!-- per-artifact generate/promote cards -->
               <div class="output-stack">
                 <div
-                  v-for="file in outputFiles"
-                  :key="file.name"
+                  v-for="art in artifactKinds"
+                  :key="art.kind"
                   class="output-card"
-                  :class="{ ready: file.exists }"
+                  :class="{ ready: artifactStatus[art.kind]?.hasCanonical }"
                 >
                   <div class="output-head">
-                    <div class="session-value mono">{{ file.name }}</div>
+                    <div class="session-value mono">{{ art.filename }}</div>
+                    <span class="status-chip mono" :class="artifactStatusClass(art.kind)">
+                      {{ artifactStatusLabel(art.kind) }}
+                    </span>
+                  </div>
+                  <div class="section-copy">{{ art.description }}</div>
+                  <div class="artifact-actions">
+                    <button
+                      class="action-btn secondary sm"
+                      :disabled="artifactStatus[art.kind]?.generating || !activeProject"
+                      @click="generateArtifact(art.kind)"
+                    >
+                      {{ artifactStatus[art.kind]?.generating ? 'generating…' : (artifactStatus[art.kind]?.hasDraft ? 'regenerate' : 'generate') }}
+                    </button>
+                    <button
+                      v-if="art.kind !== 'config'"
+                      class="action-btn primary sm"
+                      :disabled="!artifactStatus[art.kind]?.hasDraft || artifactStatus[art.kind]?.promoting"
+                      @click="promoteArtifact(art.kind)"
+                    >
+                      {{ artifactStatus[art.kind]?.promoting ? 'promoting…' : 'promote' }}
+                    </button>
                     <a
-                      v-if="file.exists"
-                      :href="'/api/prep/download/' + file.name"
+                      v-if="artifactStatus[art.kind]?.hasCanonical"
+                      :href="`${apiBase}/download/${art.filename}`"
                       class="download-badge"
                       download
-                    >↓ download</a>
-                    <div v-else class="download-badge pending">pending</div>
+                    >↓</a>
                   </div>
-                  <div class="progress-track">
-                    <div
-                      class="progress-fill"
-                      :class="file.colorClass"
-                      :style="{ width: file.progress + '%', transition: 'width 0.8s ease' }"
-                    ></div>
+                  <div v-if="artifactStatus[art.kind]?.error" class="artifact-error mono">
+                    {{ artifactStatus[art.kind].error }}
                   </div>
-                  <div class="section-copy">{{ file.description }}</div>
                 </div>
               </div>
             </div>
 
             <div class="action-row">
-              <button class="action-btn primary" :disabled="buildRunning" @click="runBuild">
-                {{ buildRunning ? 'Building…' : 'Run BUILD' }}
-              </button>
-              <button class="action-btn secondary" :disabled="!buildComplete" @click="activePhase = 'preflight'">
+              <button class="action-btn secondary" @click="activePhase = 'preflight'">
                 Advance to PREFLIGHT →
               </button>
             </div>
@@ -372,19 +534,19 @@
           </section>
 
           <!-- Default right-page content when left-page phases are active -->
-          <section v-show="activePhase === 'ingest' || activePhase === 'cast'" class="section-card info-pane">
+          <section v-show="activePhase === 'project' || activePhase === 'ingest' || activePhase === 'cast'" class="section-card info-pane">
             <div class="eyebrow mono">PACKAGE OVERVIEW</div>
             <div class="section-title serif" style="font-size:22px; margin-top:8px;">What gets generated</div>
             <div class="output-stack" style="margin-top:20px;">
-              <div v-for="file in outputFiles" :key="file.name" class="output-card" :class="{ ready: file.exists }">
+              <div v-for="art in artifactKinds" :key="art.kind" class="output-card" :class="{ ready: artifactStatus[art.kind]?.hasCanonical }">
                 <div class="output-head">
-                  <div class="session-value mono">{{ file.name }}</div>
-                  <a v-if="file.exists" :href="'/api/prep/download/' + file.name" class="download-badge" download>↓</a>
+                  <div class="session-value mono">{{ art.filename }}</div>
+                  <a v-if="artifactStatus[art.kind]?.hasCanonical" :href="`${apiBase}/download/${art.filename}`" class="download-badge" download>↓</a>
                   <div v-else class="download-badge pending">pending</div>
                 </div>
-                <div class="section-copy">{{ file.description }}</div>
+                <div class="section-copy">{{ art.description }}</div>
                 <div class="progress-track">
-                  <div class="progress-fill" :class="file.colorClass" :style="{ width: file.exists ? '100%' : '0%' }"></div>
+                  <div class="progress-fill" :class="art.colorClass" :style="{ width: artifactStatus[art.kind]?.hasCanonical ? '100%' : (artifactStatus[art.kind]?.hasDraft ? '60%' : '0%') }"></div>
                 </div>
               </div>
             </div>
@@ -402,48 +564,59 @@ export default {
 
   data() {
     return {
-      activePhase: 'ingest',
+      activePhase: 'project',
 
       phases: [
+        { id: 'project',   label: 'PROJECT',   meta: 'pick or create',      badge: '' },
         { id: 'ingest',    label: 'INGEST',    meta: 'source docs',         badge: '' },
-        { id: 'cast',      label: 'CAST',      meta: 'character profiles',  badge: '' },
-        { id: 'build',     label: 'BUILD',     meta: 'generate outputs',    badge: '' },
+        { id: 'cast',      label: 'CAST',      meta: 'AI extraction',       badge: '' },
+        { id: 'build',     label: 'BUILD',     meta: 'AI generation',       badge: '' },
         { id: 'preflight', label: 'PREFLIGHT', meta: 'validate + costs',    badge: '' },
       ],
 
-      projectName: 'Oro Verde S2',
+      // Project picker (Phase 0)
+      activeProject: null,          // slug string once selected
+      projectName: 'No project',
+      projects: [],
+      projectsLoading: false,
+      newProjectName: '',
+      creatingProject: false,
+      projectError: null,
 
+      // Ingest — 3 dynamic upload slots (was 5 hardcoded)
       docs: [
-        { id: 'bible',     label: 'Show Bible',              hint: 'Drop show bible, PDF, or fountain export',   accept: '.md,.txt,.pdf,.fountain', wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'synopsis',  label: 'Pilot Synopsis',          hint: 'Drop outline, treatment, or synopsis draft', accept: '.md,.txt,.pdf,.docx',     wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'protocol',  label: 'Interrogation Protocol',  hint: 'Prompt routines and interviewer constraints', accept: '.md,.txt',                wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'seed',      label: 'Seed Prompt',             hint: 'Core world seed, formatting rules, voice bias', accept: '.md,.txt',             wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'handoff',   label: 'Handoff Doc',             hint: 'Producer notes, decisions, phase log',       accept: '.md,.txt,.pdf',           wide: true,  loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
+        { id: 'source1', label: 'Source Document 1', hint: 'Drop a script, bible, treatment — PDF, MD, or TXT', accept: '.pdf,.md,.markdown,.txt', loaded: false, filename: '', charCount: 0, wordCount: 0, uploading: false, dragging: false, error: null },
+        { id: 'source2', label: 'Source Document 2', hint: 'Optional: second source document',                  accept: '.pdf,.md,.markdown,.txt', loaded: false, filename: '', charCount: 0, wordCount: 0, uploading: false, dragging: false, error: null },
+        { id: 'source3', label: 'Source Document 3', hint: 'Optional: third source document',                   accept: '.pdf,.md,.markdown,.txt', loaded: false, filename: '', charCount: 0, wordCount: 0, uploading: false, dragging: false, error: null },
       ],
+      analyzeResult: null,
+      analyzing: false,
 
       // Cast
       cast: [],
       excluded: [],
       castLoading: false,
       castError: null,
+      aiCastExtracting: false,
+      aiCastResult: null,           // { cast, agent_count, validation, ready_to_promote }
+      castPromoting: false,
 
-      // Build
-      buildRunning: false,
-      buildComplete: false,
+      // Build — per-artifact status
       uploadDocPreview: null,
-      outputFiles: [
-        { name: 'upload_document.md',   description: 'Full character bible and world context for the MiroFish upload field.', exists: false, progress: 0, colorClass: 'success' },
-        { name: 'reality_seed.md',      description: 'Concentrated simulation requirement — paste into Simulation Requirement field.', exists: false, progress: 0, colorClass: 'accent' },
-        { name: 'simulation_config.json', description: 'Agent behavioral profiles, cost controls, and event configuration.', exists: false, progress: 0, colorClass: 'primary' },
-        { name: 'event_seeds.json',     description: 'Eight inflection points seeded across the 168-hour arc.', exists: false, progress: 0, colorClass: 'primary' },
-        { name: 'preflight_report.md',  description: 'Full validation report with cost breakdown and upload procedure.', exists: false, progress: 0, colorClass: 'muted' },
+      artifactKinds: [
+        { kind: 'upload-document', filename: 'upload_document.md',    description: 'Curated document for MiroFish Source Material field. Starts with CHARACTER INDEX.', colorClass: 'success' },
+        { kind: 'reality-seed',    filename: 'reality_seed.md',       description: 'Focused simulation prompt — pasted into Simulation Requirement field.',           colorClass: 'accent'  },
+        { kind: 'event-seeds',     filename: 'event_seeds.json',      description: '6-8 narrative shocks mapped to simulation hours.',                                colorClass: 'primary' },
+        { kind: 'config',          filename: 'simulation_config.json', description: 'Behavioral profiles + cost controls (message_window_size=50, token_limit=150000).', colorClass: 'primary' },
       ],
+      artifactStatus: {},           // keyed by kind: { generating, promoting, preview, charCount, hasCanonical, hasDraft, error }
+      configBuildRunning: false,
 
       // Preflight
       preflightLoading: false,
       preflightResult: null,
 
-      stances: ['protagonist', 'antagonist', 'opposing', 'neutral'],
+      stances: ['protagonist', 'antagonist', 'opposing', 'neutral', 'supporting'],
     }
   },
 
@@ -451,50 +624,199 @@ export default {
     totalWords() {
       return this.docs.reduce((s, d) => s + d.wordCount, 0)
     },
+    totalChars() {
+      return this.docs.reduce((s, d) => s + d.charCount, 0)
+    },
     loadedDocCount() {
       return this.docs.filter(d => d.loaded).length
     },
-    allDocsLoaded() {
-      return this.docs.every(d => d.loaded)
+    anyDocLoaded() {
+      return this.docs.some(d => d.loaded)
     },
     activeAgentCount() {
-      return this.cast.filter(a => a._agentOn).length
+      return this.cast.filter(a => a._agentOn !== false).length
+    },
+    allArtifactsPromoted() {
+      return this.artifactKinds.every(a => this.artifactStatus[a.kind]?.hasCanonical)
+    },
+    hasAnyDraft() {
+      return this.artifactKinds.some(a => this.artifactStatus[a.kind]?.hasDraft)
     },
     packageState() {
+      if (!this.activeProject) return 'No project selected'
       if (this.preflightResult?.overall === 'PASS') return 'Ready for upload'
-      if (this.buildComplete) return 'Ready for preflight'
+      if (this.allArtifactsPromoted) return 'Ready for preflight'
       if (this.cast.length) return 'Cast approved'
-      if (this.loadedDocCount > 0) return 'Ingesting docs'
+      if (this.anyDocLoaded) return 'Ingesting docs'
       return 'Awaiting documents'
     },
     packageStateColor() {
       if (this.preflightResult?.overall === 'PASS') return 'var(--success)'
-      if (this.buildComplete) return 'var(--accent)'
+      if (this.allArtifactsPromoted) return 'var(--accent)'
       return 'var(--foreground)'
     },
     previewLines() {
       if (!this.uploadDocPreview) return []
       return this.uploadDocPreview.split('\n').slice(0, 30)
     },
+    apiBase() {
+      return this.activeProject ? `/api/prep/${this.activeProject}` : '/api/prep'
+    },
   },
 
   mounted() {
-    this.loadCast()
-    this.checkOutputFiles()
-    // Update phase badges
+    this.loadProjects()
+    // Restore active project from localStorage
+    const saved = localStorage.getItem('prepActiveProject')
+    if (saved) {
+      this.activeProject = saved
+    }
     this.updateBadges()
+  },
+
+  watch: {
+    activeProject(slug) {
+      if (slug) {
+        localStorage.setItem('prepActiveProject', slug)
+        // When a project is selected, load its state
+        this.loadProjectState()
+      } else {
+        localStorage.removeItem('prepActiveProject')
+      }
+    },
   },
 
   methods: {
     updateBadges() {
-      this.phases[0].badge = this.loadedDocCount ? `${this.loadedDocCount}/5` : ''
-      this.phases[1].badge = this.cast.length ? `${this.activeAgentCount} agents` : ''
-      this.phases[2].badge = this.buildComplete ? '5 files' : ''
-      this.phases[3].badge = this.preflightResult?.overall || ''
+      this.phases[0].badge = this.activeProject ? this.activeProject : ''
+      this.phases[1].badge = this.loadedDocCount ? `${this.loadedDocCount}/3` : ''
+      this.phases[2].badge = this.cast.length ? `${this.activeAgentCount} agents` : ''
+      const promotedCount = this.artifactKinds.filter(a => this.artifactStatus[a.kind]?.hasCanonical).length
+      this.phases[3].badge = promotedCount ? `${promotedCount}/${this.artifactKinds.length}` : ''
+      this.phases[4].badge = this.preflightResult?.overall || ''
+    },
+
+    // ── PROJECT PICKER ─────────────────────────────────────────
+    async loadProjects() {
+      this.projectsLoading = true
+      this.projectError = null
+      try {
+        const res = await fetch('/api/prep/projects')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        this.projects = data.projects || []
+      } catch (e) {
+        this.projectError = `Could not load projects: ${e.message}`
+      } finally {
+        this.projectsLoading = false
+      }
+    },
+
+    async createProject() {
+      const name = this.newProjectName.trim()
+      if (!name) return
+      this.creatingProject = true
+      this.projectError = null
+      try {
+        const res = await fetch('/api/prep/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        this.newProjectName = ''
+        await this.loadProjects()
+        this.activeProject = data.slug
+        const proj = this.projects.find(p => p.slug === data.slug)
+        if (proj) this.projectName = proj.name
+      } catch (e) {
+        this.projectError = `Could not create project: ${e.message}`
+      } finally {
+        this.creatingProject = false
+      }
+    },
+
+    selectProject(slug) {
+      this.activeProject = slug
+      const proj = this.projects.find(p => p.slug === slug)
+      this.projectName = proj ? proj.name : slug
+      this.activePhase = 'ingest'
+    },
+
+    async loadProjectState() {
+      // Reset transient state
+      this.cast = []
+      this.excluded = []
+      this.aiCastResult = null
+      this.analyzeResult = null
+      this.preflightResult = null
+      this.uploadDocPreview = null
+      this.artifactStatus = {}
+      for (const d of this.docs) {
+        d.loaded = false
+        d.filename = ''
+        d.charCount = 0
+        d.wordCount = 0
+        d.error = null
+      }
+
+      // Load everything for this project
+      await Promise.all([
+        this.loadSources(),
+        this.loadCast(),
+        this.loadFileStatus(),
+      ])
+      this.updateBadges()
+    },
+
+    async loadSources() {
+      if (!this.activeProject) return
+      try {
+        const res = await fetch(`${this.apiBase}/sources`)
+        if (!res.ok) return
+        const data = await res.json()
+        const sources = data.sources || []
+        // Fill docs array with loaded sources
+        sources.slice(0, this.docs.length).forEach((s, i) => {
+          this.docs[i].loaded = true
+          this.docs[i].filename = s.filename
+          this.docs[i].charCount = s.char_count
+          this.docs[i].wordCount = Math.round(s.char_count / 5.5)  // rough estimate
+        })
+      } catch {}
+    },
+
+    async loadFileStatus() {
+      if (!this.activeProject) return
+      try {
+        const res = await fetch(`${this.apiBase}/files`)
+        if (!res.ok) return
+        const data = await res.json()
+        for (const art of this.artifactKinds) {
+          const info = data.files?.[art.filename] || {}
+          this.artifactStatus = {
+            ...this.artifactStatus,
+            [art.kind]: {
+              hasCanonical: !!info.exists,
+              hasDraft: !!info.has_draft,
+              charCount: info.size_bytes || 0,
+              generating: false,
+              promoting: false,
+              preview: null,
+              error: null,
+            },
+          }
+        }
+      } catch {}
     },
 
     // ── INGEST ─────────────────────────────────────────────────
     triggerFileInput(doc) {
+      if (!this.activeProject) {
+        doc.error = 'Select a project first'
+        return
+      }
       const input = this.$refs['fileInput_' + doc.id]
       if (input) (Array.isArray(input) ? input[0] : input).click()
     },
@@ -511,35 +833,68 @@ export default {
     },
 
     async processFile(file, doc) {
-      doc.filename = file.name
-      const text = await file.text()
-      doc.content = text
-      // Get word count from backend or locally
-      try {
-        const res = await fetch('/api/prep/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: text }),
-        })
-        if (res.ok) {
-          const data = await res.json()
-          doc.wordCount = data.word_count
-        } else {
-          doc.wordCount = text.split(/\s+/).filter(Boolean).length
-        }
-      } catch {
-        doc.wordCount = text.split(/\s+/).filter(Boolean).length
+      if (!this.activeProject) {
+        doc.error = 'Select a project first'
+        return
       }
-      doc.loaded = true
-      this.updateBadges()
+      doc.uploading = true
+      doc.error = null
+      doc.filename = file.name
+
+      // Build FormData — server-side extracts text (handles PDFs correctly)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const res = await fetch(`${this.apiBase}/upload`, {
+          method: 'POST',
+          body: formData,
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        doc.charCount = data.char_count
+        doc.wordCount = data.word_count
+        doc.loaded = true
+      } catch (e) {
+        doc.error = e.message
+        doc.loaded = false
+      } finally {
+        doc.uploading = false
+        this.updateBadges()
+      }
+    },
+
+    async analyzeSources() {
+      if (!this.activeProject) return
+      this.analyzing = true
+      try {
+        const res = await fetch(`${this.apiBase}/analyze`, { method: 'POST' })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        this.analyzeResult = data.analysis || data
+      } catch (e) {
+        this.analyzeResult = { error: e.message }
+      } finally {
+        this.analyzing = false
+      }
     },
 
     // ── CAST ───────────────────────────────────────────────────
     async loadCast() {
+      if (!this.activeProject) return
       this.castLoading = true
       this.castError = null
       try {
-        const res = await fetch('/api/prep/cast')
+        const res = await fetch(`${this.apiBase}/cast`)
+        if (res.status === 404) {
+          // No cast yet — not an error, just empty state
+          this.cast = []
+          this.excluded = []
+          return
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
         const agents = data.mandatory_agents || []
@@ -547,13 +902,14 @@ export default {
         this.excluded = data.excluded_entities || []
         this.updateBadges()
       } catch (e) {
-        this.castError = `Could not load cast: ${e.message}. Make sure the backend is running.`
+        this.castError = `Could not load cast: ${e.message}`
       } finally {
         this.castLoading = false
       }
     },
 
     async saveCast() {
+      if (!this.activeProject) return
       const payload = {
         mandatory_agents: this.cast.map(a => {
           const { _agentOn, ...rest } = a
@@ -562,13 +918,52 @@ export default {
         excluded_entities: this.excluded,
       }
       try {
-        await fetch('/api/prep/cast', {
+        await fetch(`${this.apiBase}/cast`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
       } catch (e) {
         console.error('Save cast failed:', e)
+      }
+    },
+
+    async extractCastViaAI() {
+      if (!this.activeProject) return
+      this.aiCastExtracting = true
+      this.aiCastResult = null
+      this.castError = null
+      try {
+        const res = await fetch(`${this.apiBase}/extract-cast`, { method: 'POST' })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${res.status}`)
+        }
+        this.aiCastResult = await res.json()
+        // Preview the extracted cast immediately
+        const draftCast = this.aiCastResult.cast || {}
+        this.cast = (draftCast.mandatory_agents || []).map(a => ({ ...a, _agentOn: true }))
+        this.excluded = draftCast.excluded_entities || []
+        this.updateBadges()
+      } catch (e) {
+        this.castError = `AI extraction failed: ${e.message}`
+      } finally {
+        this.aiCastExtracting = false
+      }
+    },
+
+    async promoteCast() {
+      if (!this.activeProject) return
+      this.castPromoting = true
+      try {
+        const res = await fetch(`${this.apiBase}/promote/cast`, { method: 'POST' })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        await this.loadFileStatus()
+        this.updateBadges()
+      } catch (e) {
+        this.castError = `Promote failed: ${e.message}`
+      } finally {
+        this.castPromoting = false
       }
     },
 
@@ -596,71 +991,117 @@ export default {
     },
 
     // ── BUILD ──────────────────────────────────────────────────
-    async runBuild() {
-      this.buildRunning = true
-      // Animate progress bars
-      this.outputFiles.forEach((f, i) => {
-        setTimeout(() => { f.progress = 30 + Math.random() * 40 }, i * 300)
-      })
+    _setArtifactStatus(kind, partial) {
+      this.artifactStatus = {
+        ...this.artifactStatus,
+        [kind]: { ...(this.artifactStatus[kind] || {}), ...partial },
+      }
+    },
+
+    async generateArtifact(kind) {
+      if (!this.activeProject) return
+      // 'config' artifact uses the existing /build endpoint (non-LLM)
+      if (kind === 'config') return this.generateConfig()
+
+      this._setArtifactStatus(kind, { generating: true, error: null })
       try {
-        const res = await fetch('/api/prep/build', { method: 'POST' })
-        const data = await res.json()
-        // Update file statuses
-        for (const file of this.outputFiles) {
-          const info = data.files?.[file.name]
-          if (info?.exists) {
-            file.exists = true
-            file.progress = 100
-          }
+        const res = await fetch(`${this.apiBase}/generate/${kind}`, { method: 'POST' })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${res.status}`)
         }
-        this.buildComplete = true
-        // Load preview of upload_document
-        await this.loadUploadDocPreview()
+        const data = await res.json()
+        this._setArtifactStatus(kind, {
+          hasDraft: true,
+          preview: data.preview,
+          charCount: data.char_count,
+          overLimit: data.over_limit,
+        })
+        // For upload-document, update the visible preview
+        if (kind === 'upload-document') {
+          this.uploadDocPreview = data.preview
+        }
+      } catch (e) {
+        this._setArtifactStatus(kind, { error: e.message })
+      } finally {
+        this._setArtifactStatus(kind, { generating: false })
+      }
+    },
+
+    async generateConfig() {
+      if (!this.activeProject) return
+      this._setArtifactStatus('config', { generating: true, error: null })
+      this.configBuildRunning = true
+      try {
+        const res = await fetch(`${this.apiBase}/build`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duration: 168, language: 'es' }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        await this.loadFileStatus()
+      } catch (e) {
+        this._setArtifactStatus('config', { error: e.message })
+      } finally {
+        this.configBuildRunning = false
+        this._setArtifactStatus('config', { generating: false })
+      }
+    },
+
+    async promoteArtifact(kind) {
+      if (!this.activeProject) return
+      if (kind === 'config') return  // config is written directly by /build
+      this._setArtifactStatus(kind, { promoting: true, error: null })
+      try {
+        const res = await fetch(`${this.apiBase}/promote/${kind}`, { method: 'POST' })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${res.status}`)
+        }
+        this._setArtifactStatus(kind, { hasCanonical: true })
+        await this.loadFileStatus()
+        if (kind === 'upload-document') {
+          await this.loadUploadDocPreview()
+        }
         this.updateBadges()
       } catch (e) {
-        console.error('Build failed:', e)
+        this._setArtifactStatus(kind, { error: e.message })
       } finally {
-        this.buildRunning = false
+        this._setArtifactStatus(kind, { promoting: false })
       }
     },
 
     async loadUploadDocPreview() {
+      if (!this.activeProject) return
       try {
-        const res = await fetch('/api/prep/download/upload_document.md')
+        const res = await fetch(`${this.apiBase}/download/upload_document.md`)
         if (res.ok) {
           this.uploadDocPreview = await res.text()
         }
       } catch {}
     },
 
-    async checkOutputFiles() {
-      try {
-        const res = await fetch('/api/prep/files')
-        if (!res.ok) return
-        const data = await res.json()
-        let anyExists = false
-        for (const file of this.outputFiles) {
-          const info = data.files?.[file.name]
-          if (info?.exists) {
-            file.exists = true
-            file.progress = 100
-            anyExists = true
-          }
-        }
-        if (anyExists) {
-          this.buildComplete = true
-          await this.loadUploadDocPreview()
-          this.updateBadges()
-        }
-      } catch {}
+    artifactStatusLabel(kind) {
+      const s = this.artifactStatus[kind] || {}
+      if (s.hasCanonical) return 'PROMOTED'
+      if (s.hasDraft) return 'DRAFT'
+      return 'NO DRAFT'
+    },
+
+    artifactStatusClass(kind) {
+      const s = this.artifactStatus[kind] || {}
+      if (s.hasCanonical) return 'status-promoted'
+      if (s.hasDraft) return 'status-draft'
+      return 'status-empty'
     },
 
     // ── PREFLIGHT ──────────────────────────────────────────────
     async runPreflight() {
+      if (!this.activeProject) return
       this.preflightLoading = true
       this.preflightResult = null
       try {
-        const res = await fetch('/api/prep/validate')
+        const res = await fetch(`${this.apiBase}/validate`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         this.preflightResult = await res.json()
         this.updateBadges()
@@ -745,7 +1186,7 @@ export default {
 /* stepper */
 .stepper {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
 }
 
@@ -827,11 +1268,175 @@ export default {
 .section-title { font-size: 22px; line-height: 1.2; font-weight: 600; margin-top: 4px; }
 .section-copy  { font-size: 13px; line-height: 1.6; color: var(--muted-fg); }
 
+/* ── PROJECT PICKER (PHASE 0) ──────────────────────────────── */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.project-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 110px;
+}
+.project-card:hover  { border-color: var(--primary); box-shadow: 0 4px 12px rgba(107,143,113,.12); }
+.project-card.active { background: var(--secondary); border-color: var(--accent); }
+.project-card.new    { border-style: dashed; cursor: default; justify-content: center; align-items: center; gap: 8px; }
+
+.project-name { font-size: 15px; font-weight: 600; }
+.project-slug { font-size: 11px; color: var(--muted-fg); }
+.project-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+.pm-pill {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-fg);
+  font-size: 10px;
+}
+.pm-pill.pm-on { background: rgba(107,143,113,.15); color: var(--primary); }
+
+.project-new-label { font-size: 12px; color: var(--muted-fg); }
+.project-new-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--card);
+}
+.project-new-input:focus { outline: none; border-color: var(--primary); }
+
 /* ── DOC GRID (INGEST) ─────────────────────────────────────── */
 .doc-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+.doc-grid.three-col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.doc-card.uploading { border-color: var(--accent); }
+.doc-card.errored   { border-color: var(--destructive); }
+.doc-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--destructive);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+.analyze-panel {
+  margin-top: 14px;
+  padding: 12px;
+  background: var(--muted);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.analyze-json {
+  font-size: 10px;
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+  max-height: 200px;
+  overflow: auto;
+  color: var(--muted-fg);
+}
+
+/* ── AI PANEL (PHASE 2) ────────────────────────────────────── */
+.ai-panel {
+  background: linear-gradient(135deg, rgba(232,200,122,.08), rgba(107,143,113,.05));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.ai-panel-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.ai-result {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.ai-result-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 4px 0;
+}
+.ai-warning {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(232,200,122,.15);
+  border-left: 3px solid var(--accent);
+  font-size: 11px;
+  color: #8B6914;
+}
+.ai-checks {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ai-check-row {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+}
+.ai-check-row.fail { background: rgba(185,75,75,.1); color: var(--destructive); }
+.ai-check-row.warn { background: rgba(232,200,122,.15); color: #8B6914; }
+
+/* ── BUILD STATUS CHIPS ────────────────────────────────────── */
+.status-chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+.status-promoted { background: rgba(107,143,113,.18); color: var(--primary); }
+.status-draft    { background: rgba(232,200,122,.25); color: #8B6914; }
+.status-empty    { background: var(--muted); color: var(--muted-fg); }
+
+.artifact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+.artifact-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--destructive);
+  padding: 6px 8px;
+  background: rgba(185,75,75,.08);
+  border-radius: var(--radius-sm);
+}
+
+/* Small action button variant */
+.action-btn.sm {
+  padding: 6px 12px;
+  font-size: 11px;
 }
 
 .doc-card {
