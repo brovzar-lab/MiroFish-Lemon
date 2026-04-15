@@ -1,0 +1,83 @@
+name: Build, Push & Deploy
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/mirofish-lemon
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    # Only deploy if VPS_SSH_KEY secret is configured
+    if: ${{ secrets.VPS_SSH_KEY != '' }}
+
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "=== Pulling latest image ==="
+            docker pull ghcr.io/${{ github.repository_owner }}/mirofish-lemon:latest
+
+            echo "=== Updating docker-compose image reference ==="
+            cd /docker/mirofish-lhv2
+            # Update the image in docker-compose.yml to use our fork's image
+            sed -i 's|image: .*mirofish.*|image: ghcr.io/${{ github.repository_owner }}/mirofish-lemon:latest|' docker-compose.yml
+
+            echo "=== Restarting container (preserving volumes) ==="
+            docker compose up -d --no-deps --pull never mirofish
+
+            echo "=== Verifying health ==="
+            sleep 10
+            docker ps | grep mirofish
+            echo "=== Deploy complete ==="

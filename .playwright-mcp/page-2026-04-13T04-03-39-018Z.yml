@@ -1,0 +1,262 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: SYS.NODE // SECTOR_7G // UPLINK_ESTABLISHED
+        - generic [ref=e6]: ENCRYPTED_CHANNEL
+      - generic [ref=e7]:
+        - button "[ SYS.RET ] ALL PROJECTS" [ref=e8] [cursor=pointer]:
+          - img [ref=e9]
+          - text: "[ SYS.RET ] ALL PROJECTS"
+        - generic [ref=e12]:
+          - heading "ORO VERDE" [level=1] [ref=e13]
+          - generic [ref=e14]: "STATUS: 14 ENTITIES ONLINE // DIRECTORY_SYNCED"
+      - generic [ref=e16]:
+        - button "ALL (14)" [ref=e17] [cursor=pointer]
+        - button "SERRANO_FAMILY (6)" [ref=e18] [cursor=pointer]
+        - button "UNKNOWN (1)" [ref=e19] [cursor=pointer]
+        - button "CARTEL (3)" [ref=e20] [cursor=pointer]
+        - button "PUBLIC (2)" [ref=e21] [cursor=pointer]
+        - button "INVESTIGATORS (2)" [ref=e22] [cursor=pointer]
+      - generic [ref=e23]:
+        - generic [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]:
+            - generic [ref=e26]: ID:0x064
+            - generic [ref=e27]: SERRANO_FAMILY
+          - generic [ref=e28]:
+            - generic [ref=e29]:
+              - generic [ref=e32]: B
+              - generic [ref=e33]:
+                - heading "Benjamín Serrano" [level=3] [ref=e34]
+                - generic [ref=e35]:
+                  - generic [ref=e36]: "AGE: 35"
+                  - generic [ref=e37]: "CLS: ENTJ"
+                  - generic [ref=e38]: "ROLE: CEO"
+            - paragraph [ref=e39]: Middle sibling. Harvard-educated. The polished surface — the right jersey in Dallas, the pitch deck, the calculated warmth in every room — conceals a man who doesn't know who he is when no one is watching. Currently the public face of Don Ezequiel's criminal empire, performing legitimacy.
+          - generic [ref=e40]:
+            - generic [ref=e41]: "ACT: 0 // PROTAGONIST"
+            - button ">_ CONNECT" [ref=e43]
+        - generic [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]:
+            - generic [ref=e46]: ID:0x065
+            - generic [ref=e47]: SERRANO_FAMILY
+          - generic [ref=e48]:
+            - generic [ref=e49]:
+              - generic [ref=e52]: K
+              - generic [ref=e53]:
+                - heading "Karla Serrano" [level=3] [ref=e54]
+                - generic [ref=e55]:
+                  - generic [ref=e56]: "AGE: 40"
+                  - generic [ref=e57]: "CLS: ESTJ"
+                  - generic [ref=e58]: "ROLE: DIR"
+            - paragraph [ref=e59]: Oldest sibling. Took responsibility for her siblings the day their parents died and has been doing it so long she's forgotten she had a choice. Her armor — aggressive control, physical dominance, strategic thinking — works in every room except the ones where she wants to be seen.
+          - generic [ref=e60]:
+            - generic [ref=e61]: "ACT: 0 // PROTAGONIST"
+            - button ">_ CONNECT" [ref=e63]
+        - generic [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]:
+            - generic [ref=e66]: ID:0x066
+            - generic [ref=e67]: SERRANO_FAMILY
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - generic [ref=e72]: I
+              - generic [ref=e73]:
+                - heading "Isabela Serrano" [level=3] [ref=e74]
+                - generic [ref=e75]:
+                  - generic [ref=e76]: "AGE: 24"
+                  - generic [ref=e77]: "CLS: ENFP"
+                  - generic [ref=e78]: "ROLE: ART"
+            - paragraph [ref=e79]: Youngest sibling. The one no one takes seriously, which is exactly why she's the most dangerous. Uses humor, beauty, and chaos as a shield against grief she has never processed. Recovered from addiction. The only sibling actively moving toward the truth.
+          - generic [ref=e80]:
+            - generic [ref=e81]: "ACT: 0 // PROTAGONIST"
+            - button ">_ CONNECT" [ref=e83]
+        - generic [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]:
+            - generic [ref=e86]: ID:0x067
+            - generic [ref=e87]: UNKNOWN
+          - generic [ref=e88]:
+            - generic [ref=e89]:
+              - generic [ref=e92]: U
+              - generic [ref=e93]:
+                - heading "Unnamed Thief" [level=3] [ref=e94]
+                - generic [ref=e95]:
+                  - generic [ref=e96]: "AGE: 28"
+                  - generic [ref=e97]: "CLS: ISTP"
+                  - generic [ref=e98]: "ROLE: THIEF"
+            - paragraph [ref=e99]: The figure who cracked Ernesto's safe behind a Remedios Varo painting and took the blue folder. He is now in possession of the most dangerous document in the Serrano universe — Carmen's complete 40-year archive. He is too afraid to fully open it.
+          - generic [ref=e100]:
+            - generic [ref=e101]: "ACT: 0 // NEUTRAL"
+            - button ">_ CONNECT" [ref=e103]
+        - generic [ref=e104] [cursor=pointer]:
+          - generic [ref=e105]:
+            - generic [ref=e106]: ID:0x068
+            - generic [ref=e107]: CARTEL
+          - generic [ref=e108]:
+            - generic [ref=e109]:
+              - generic [ref=e112]: D
+              - generic [ref=e113]:
+                - heading "Don Ezequiel Antona" [level=3] [ref=e114]
+                - generic [ref=e115]:
+                  - generic [ref=e116]: "AGE: 65"
+                  - generic [ref=e117]: "CLS: INTJ"
+                  - generic [ref=e118]: "ROLE: OPR"
+            - paragraph [ref=e119]: Carmen's mirror — same Enneagram type, same wing, different roads. Built a criminal operation parallel to the Serranos' legitimate empire. Doesn't intimidate with volume. Intimidates with patience. His cigar snapped when Benjamín claimed the company on television.
+          - generic [ref=e120]:
+            - generic [ref=e121]: "ACT: 0 // ANTAGONIST"
+            - button ">_ CONNECT" [ref=e123]
+        - generic [ref=e124] [cursor=pointer]:
+          - generic [ref=e125]:
+            - generic [ref=e126]: ID:0x069
+            - generic [ref=e127]: SERRANO_FAMILY
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - generic [ref=e132]: G
+              - generic [ref=e133]:
+                - heading "Gabriela Ruiz" [level=3] [ref=e134]
+                - generic [ref=e135]:
+                  - generic [ref=e136]: "AGE: 63"
+                  - generic [ref=e137]: "CLS: ISFJ"
+                  - generic [ref=e138]: "ROLE: HSK"
+            - paragraph [ref=e139]: 40 years in Carmen's service. Has cleaned around every secret in this family. Knows the full history — the ledgers, the photographs, the arrangement with Don Ezequiel, and what really happened to the parents' plane. Carmen never told her directly. Decades of proximity made concealment impossible.
+          - generic [ref=e140]:
+            - generic [ref=e141]: "ACT: 0 // NEUTRAL"
+            - button ">_ CONNECT" [ref=e143]
+        - generic [ref=e144] [cursor=pointer]:
+          - generic [ref=e145]:
+            - generic [ref=e146]: ID:0x06A
+            - generic [ref=e147]: PUBLIC
+          - generic [ref=e148]:
+            - generic [ref=e149]:
+              - generic [ref=e152]: V
+              - generic [ref=e153]:
+                - heading "Valeria Luna" [level=3] [ref=e154]
+                - generic [ref=e155]:
+                  - generic [ref=e156]: "AGE: 34"
+                  - generic [ref=e157]: "CLS: INTJ"
+                  - generic [ref=e158]: "ROLE: ARCH"
+            - paragraph [ref=e159]: Benjamín's wife. Married the version of him she was shown. She can feel that version dissolving. She doesn't know what's replacing it. What makes her dangerous is that she loves him enough to look — and is smart enough to find things.
+          - generic [ref=e160]:
+            - generic [ref=e161]: "ACT: 0 // OBSERVER"
+            - button ">_ CONNECT" [ref=e163]
+        - generic [ref=e164] [cursor=pointer]:
+          - generic [ref=e165]:
+            - generic [ref=e166]: ID:0x06B
+            - generic [ref=e167]: INVESTIGATORS
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - generic [ref=e172]: I
+              - generic [ref=e173]:
+                - heading "Ingrid Cervantes" [level=3] [ref=e174]
+                - generic [ref=e175]:
+                  - generic [ref=e176]: "AGE: 38"
+                  - generic [ref=e177]: "CLS: INTJ"
+                  - generic [ref=e178]: "ROLE: JOURNO"
+            - paragraph [ref=e179]: The journalist who will not stop. Trained at UNAM and Columbia. Investigating Ernesto Vega's death and its connection to the Serrano family. In love with Karla Serrano — the woman whose family she's investigating. Has seen evidence that Grupo Serrano is a front for Don Ezequiel's operation.
+          - generic [ref=e180]:
+            - generic [ref=e181]: "ACT: 71 // OPPOSING"
+            - button ">_ CONNECT" [ref=e183]
+        - generic [ref=e184] [cursor=pointer]:
+          - generic [ref=e185]:
+            - generic [ref=e186]: ID:0x06C
+            - generic [ref=e187]: INVESTIGATORS
+          - generic [ref=e188]:
+            - generic [ref=e189]:
+              - generic [ref=e192]: E
+              - generic [ref=e193]:
+                - heading "Emilio Vega" [level=3] [ref=e194]
+                - generic [ref=e195]:
+                  - generic [ref=e196]: "AGE: 36"
+                  - generic [ref=e197]: "CLS: INFP"
+                  - generic [ref=e198]: "ROLE: INV"
+            - paragraph [ref=e199]: Came to Michoacán to close his father's estate and go home. The details don't add up. He knows the safe was opened by someone who knew the combination — not a burglar. His involuntary alliance with Ingrid creates the most sustained external threat to the siblings.
+          - generic [ref=e200]:
+            - generic [ref=e201]: "ACT: 38 // OPPOSING"
+            - button ">_ CONNECT" [ref=e203]
+        - generic [ref=e204] [cursor=pointer]:
+          - generic [ref=e205]:
+            - generic [ref=e206]: ID:0x000
+            - generic [ref=e207]: CARTEL
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - generic [ref=e212]: R
+              - generic [ref=e213]:
+                - heading "Reynaldo" [level=3] [ref=e214]
+                - generic [ref=e215]:
+                  - generic [ref=e216]: "AGE: 35"
+                  - generic [ref=e217]: "CLS: ISFP"
+                  - generic [ref=e218]: "ROLE: 建筑工人"
+            - paragraph [ref=e219]: 生活在城市边缘的普通人，经历过一些不堪回首的往事。平时不太爱说话，但内心有自己的坚持。喜欢独处，偶尔在社交媒体上分享一些生活感悟。相信每个人都有改过自新的机会，也在努力让自己变得更好。
+          - generic [ref=e220]:
+            - generic [ref=e221]: "ACT: 22 // OPPOSING"
+            - button ">_ CONNECT" [ref=e223]
+        - generic [ref=e224] [cursor=pointer]:
+          - generic [ref=e225]:
+            - generic [ref=e226]: ID:0x00E
+            - generic [ref=e227]: SERRANO_FAMILY
+          - generic [ref=e228]:
+            - generic [ref=e229]:
+              - generic [ref=e232]: J
+              - generic [ref=e233]:
+                - heading "Journalists" [level=3] [ref=e234]
+                - generic [ref=e235]:
+                  - generic [ref=e236]: "AGE: 42"
+                  - generic [ref=e237]: "CLS: INTJ"
+                  - generic [ref=e238]: "ROLE: 调查记者"
+            - paragraph [ref=e239]: 资深调查记者，专注报道拉美地区犯罪与政商勾结。十五年新闻从业经验，曾深入墨西哥米却肯州调查毒品贸易。坚信真相的力量，即使面对威胁也不退缩。关注社会正义，揭露权力腐败。曾获普利策奖提名。现居美国，为多家媒体供稿。
+          - generic [ref=e240]:
+            - generic [ref=e241]: "ACT: 72 // OBSERVER"
+            - button ">_ CONNECT" [ref=e243]
+        - generic [ref=e244] [cursor=pointer]:
+          - generic [ref=e245]:
+            - generic [ref=e246]: ID:0x0C8
+            - generic [ref=e247]: CARTEL
+          - generic [ref=e248]:
+            - generic [ref=e249]:
+              - generic [ref=e252]: J
+              - generic [ref=e253]:
+                - heading "Javier Cordero" [level=3] [ref=e254]
+                - generic [ref=e255]:
+                  - generic [ref=e256]: "AGE: 40"
+                  - generic [ref=e257]: "CLS: INTJ"
+                  - generic [ref=e258]: "ROLE: CFO"
+            - paragraph [ref=e259]: Harvard MBA, bespoke suits, smile like a spreadsheet. Don Ezequiel's embedded analyst for years — accumulating information with the precision of a man who knows that knowledge withheld at the right moment is a weapon.
+          - generic [ref=e260]:
+            - generic [ref=e261]: "ACT: 95 // SUPPORTIVE"
+            - button ">_ CONNECT" [ref=e263]
+        - generic [ref=e264] [cursor=pointer]:
+          - generic [ref=e265]:
+            - generic [ref=e266]: ID:0x0C9
+            - generic [ref=e267]: PUBLIC
+          - generic [ref=e268]:
+            - generic [ref=e269]:
+              - generic [ref=e272]: L
+              - generic [ref=e273]:
+                - heading "Lucía Suárez" [level=3] [ref=e274]
+                - generic [ref=e275]:
+                  - generic [ref=e276]: "AGE: 35"
+                  - generic [ref=e277]: "CLS: ENFJ"
+                  - generic [ref=e278]: "ROLE: ACT"
+            - paragraph [ref=e279]: She fights against Grupo Serrano's destruction of Michoacán's rivers and forests with a megaphone, a live feed, and a moral clarity that makes Benjamín feel transparent. The only character who says exactly what she thinks.
+          - generic [ref=e280]:
+            - generic [ref=e281]: "ACT: 128 // OPPOSING"
+            - button ">_ CONNECT" [ref=e283]
+        - generic [ref=e284] [cursor=pointer]:
+          - generic [ref=e285]:
+            - generic [ref=e286]: ID:0x0CA
+            - generic [ref=e287]: SERRANO_FAMILY
+          - generic [ref=e288]:
+            - generic [ref=e289]:
+              - generic [ref=e292]: S
+              - generic [ref=e293]:
+                - heading "Serrano Social" [level=3] [ref=e294]
+                - generic [ref=e295]:
+                  - generic [ref=e296]: "AGE: 0"
+                  - generic [ref=e297]: "CLS: N/A"
+                  - generic [ref=e298]: "ROLE: MEDIA"
+            - paragraph [ref=e299]: The official public voice of Grupo Serrano — the family's curated social media presence. Everything posted here is performance. ESG commitments, sustainability reports, community engagement. The legitimate face of a criminal empire.
+          - generic [ref=e300]:
+            - generic [ref=e301]: "ACT: 140 // SUPPORTIVE"
+            - button ">_ CONNECT" [ref=e303]
+  - button "Open Next.js Dev Tools" [ref=e309] [cursor=pointer]:
+    - img [ref=e310]
+  - alert [ref=e313]

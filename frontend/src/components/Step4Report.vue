@@ -136,6 +136,25 @@
             </svg>
           </button>
 
+          <!-- Resume Button - 在失败/credits耗尽后显示 -->
+          <button v-if="isFailed && !isComplete" class="resume-btn" :disabled="isResuming" @click="resumeGeneration">
+            <svg v-if="!isResuming" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <div v-else class="btn-spinner"></div>
+            <span>{{ isResuming ? 'Resuming...' : 'Resume Generation' }}</span>
+          </button>
+
+          <!-- Credit Exhaustion Warning -->
+          <div v-if="isCreditError && !isResuming" class="credit-warning">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>API credits exhausted. Top up <a href="https://openrouter.ai/settings/credits" target="_blank">OpenRouter</a> then click Resume.</span>
+          </div>
+
           <div class="workflow-divider"></div>
         </div>
 
@@ -425,6 +444,9 @@ const expandedContent = ref(new Set())
 const expandedLogs = ref(new Set())
 const collapsedSections = ref(new Set())
 const isComplete = ref(false)
+const isFailed = ref(false)
+const isCreditError = ref(false)
+const isResuming = ref(false)
 const startTime = ref(null)
 const leftPanel = ref(null)
 const rightPanel = ref(null)
@@ -1708,12 +1730,14 @@ const QuickSearchDisplay = {
 // Computed
 const statusClass = computed(() => {
   if (isComplete.value) return 'completed'
+  if (isFailed.value) return 'error'
   if (agentLogs.value.length > 0) return 'processing'
   return 'pending'
 })
 
 const statusText = computed(() => {
   if (isComplete.value) return 'Completed'
+  if (isFailed.value) return isCreditError.value ? 'Credits Exhausted' : 'Error'
   if (agentLogs.value.length > 0) return 'Generating...'
   return 'Waiting'
 })
@@ -2054,6 +2078,7 @@ const fetchAgentLog = async () => {
           
           if (log.action === 'report_complete') {
             isComplete.value = true
+            isFailed.value = false
             currentSectionIndex.value = null  // 确保清除 loading 状态
             emit('update-status', 'completed')
             stopPolling()
@@ -2157,11 +2182,14 @@ const fetchConsoleLog = async () => {
 const startPolling = () => {
   if (agentLogTimer || consoleLogTimer) return
   
+  // If already complete/failed, load initial snapshot once then stop
   fetchAgentLog()
   fetchConsoleLog()
   
-  agentLogTimer = setInterval(fetchAgentLog, 2000)
-  consoleLogTimer = setInterval(fetchConsoleLog, 1500)
+  if (!isComplete.value && !isFailed.value) {
+    agentLogTimer = setInterval(fetchAgentLog, 2000)
+    consoleLogTimer = setInterval(fetchConsoleLog, 1500)
+  }
 }
 
 const stopPolling = () => {
@@ -2175,10 +2203,65 @@ const stopPolling = () => {
   }
 }
 
+// Check initial report status (handles navigating to a failed/completed report)
+const checkInitialReportStatus = async () => {
+  if (!props.reportId) return
+  try {
+    const { getReport } = await import('../api/report')
+    const res = await getReport(props.reportId)
+    if (res.success && res.data) {
+      const { status, error } = res.data
+      if (status === 'completed') {
+        isComplete.value = true
+        stopPolling()
+      } else if (status === 'failed') {
+        isFailed.value = true
+        if (error && error.includes('credits exhausted')) {
+          isCreditError.value = true
+        }
+        stopPolling()
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to check initial report status:', err)
+  }
+}
+
+// Resume a failed/paused generation
+const resumeGeneration = async () => {
+  if (!props.simulationId || isResuming.value) return
+  isResuming.value = true
+  isFailed.value = false
+  isCreditError.value = false
+  try {
+    const { generateReport } = await import('../api/report')
+    const res = await generateReport({ simulation_id: props.simulationId, force_regenerate: false })
+    if (res.success) {
+      // Reset log state and restart polling
+      agentLogs.value = []
+      consoleLogs.value = []
+      agentLogLine.value = 0
+      consoleLogLine.value = 0
+      currentSectionIndex.value = null
+      isComplete.value = false
+      startPolling()
+    } else {
+      isFailed.value = true
+      console.error('Resume failed:', res.error)
+    }
+  } catch (err) {
+    isFailed.value = true
+    console.error('Resume exception:', err)
+  } finally {
+    isResuming.value = false
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   if (props.reportId) {
     addLog(`Report Agent initialized: ${props.reportId}`)
+    checkInitialReportStatus()
     startPolling()
   }
 })
@@ -2200,6 +2283,8 @@ watch(() => props.reportId, (newId) => {
     expandedLogs.value = new Set()
     collapsedSections.value = new Set()
     isComplete.value = false
+    isFailed.value = false
+    isCreditError.value = false
     startTime.value = null
     
     startPolling()
@@ -3430,6 +3515,78 @@ watch(() => props.reportId, (newId) => {
 
 .next-step-btn:hover svg {
   transform: translateX(4px);
+}
+
+/* Resume Button */
+.resume-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 40px);
+  margin: 8px 20px 0 20px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: #059669;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.resume-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.resume-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Credit Warning */
+.credit-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 20px 0 20px;
+  padding: 10px 12px;
+  background: #FEF3C7;
+  border: 1px solid #F59E0B;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #92400E;
+  line-height: 1.4;
+}
+
+.credit-warning a {
+  color: #B45309;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.credit-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  stroke: #D97706;
+}
+
+/* Error status pill */
+.metric-pill.pill--error {
+  background: #FEE2E2;
+  color: #991B1B;
 }
 
 /* Workflow Empty */

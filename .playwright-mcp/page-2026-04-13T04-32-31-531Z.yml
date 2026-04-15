@@ -1,0 +1,27 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - button "[ SYS.RET ] GALLERY" [ref=e4] [cursor=pointer]
+      - generic [ref=e6]: THE_ROOM
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - generic [ref=e9]: B
+          - generic [ref=e10]: Benjamín
+        - generic [ref=e11]:
+          - generic [ref=e12]: K
+          - generic [ref=e13]: Karla
+        - generic [ref=e14]:
+          - generic [ref=e15]: I
+          - generic [ref=e16]: Ingrid
+      - generic [ref=e17]: 3 AGENTS_ONLINE
+    - generic [ref=e19]:
+      - generic [ref=e22]:
+        - paragraph [ref=e23]: Start a conversation
+        - paragraph [ref=e24]: Ask a question — all characters in the room will respond.
+      - generic [ref=e26]:
+        - textbox "Ask the room a question..." [ref=e27]
+        - button [disabled]:
+          - img
+  - button "Open Next.js Dev Tools" [ref=e33] [cursor=pointer]:
+    - img [ref=e34]
+  - alert [ref=e37]

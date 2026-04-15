@@ -7,8 +7,14 @@ import json
 import re
 from typing import Optional, Dict, Any, List
 from openai import OpenAI
+import openai
 
 from ..config import Config
+
+
+class CreditExhaustedException(Exception):
+    """Raised when the LLM API returns a 402 Payment Required (out of credits)."""
+    pass
 
 
 class LLMClient:
@@ -61,7 +67,15 @@ class LLMClient:
         if response_format:
             kwargs["response_format"] = response_format
         
-        response = self.client.chat.completions.create(**kwargs)
+        try:
+            response = self.client.chat.completions.create(**kwargs)
+        except openai.APIStatusError as e:
+            if e.status_code == 402:
+                raise CreditExhaustedException(
+                    f"API credits exhausted (402). Top up your OpenRouter balance and click Resume to continue."
+                ) from e
+            raise
+        
         content = response.choices[0].message.content
         # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()

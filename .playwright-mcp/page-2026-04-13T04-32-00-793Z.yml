@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: SYS.NODE // SECTOR_7G // UPLINK_ESTABLISHED
+        - generic [ref=e6]: ENCRYPTED_CHANNEL
+      - generic [ref=e7]:
+        - heading "Character Engine" [level=1] [ref=e8]
+        - paragraph [ref=e9]: MIROFISH_SIMULATION_INTERVIEWS // SELECT_PROJECT
+      - link "PROJECT:ORO_VERDE 2026-04-11T10:17:17.925Z ORO VERDE 14 characters (9 key + 5 supporting), enriched with simulation memory 14 AGENTS 872 ACTIONS DIRECTORY_SYNCED >_ ENTER" [ref=e12] [cursor=pointer]:
+        - /url: /oro-verde
+        - generic [ref=e13]:
+          - generic [ref=e14]:
+            - generic [ref=e15]: PROJECT:ORO_VERDE
+            - generic [ref=e16]: 2026-04-11T10:17:17.925Z
+          - generic [ref=e17]:
+            - generic [ref=e18]:
+              - heading "ORO VERDE" [level=2] [ref=e19]
+              - paragraph [ref=e20]: 14 characters (9 key + 5 supporting), enriched with simulation memory
+            - generic [ref=e21]:
+              - generic [ref=e22]:
+                - generic [ref=e23]: "14"
+                - generic [ref=e24]: AGENTS
+              - generic [ref=e25]:
+                - generic [ref=e26]: "872"
+                - generic [ref=e27]: ACTIONS
+          - generic [ref=e28]:
+            - generic [ref=e29]: DIRECTORY_SYNCED
+            - generic [ref=e31]: ">_ ENTER"
+  - button "Open Next.js Dev Tools" [ref=e37] [cursor=pointer]:
+    - img [ref=e38]
+  - alert [ref=e41]

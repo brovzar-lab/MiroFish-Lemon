@@ -1,30 +1,46 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import Process from '../views/MainView.vue'
+
+// Existing views
 import SimulationView from '../views/SimulationView.vue'
 import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
-import ProjectsView from '../views/ProjectsView.vue'
+
+// Pipeline views
+import PipelineDashboard from '../views/PipelineDashboard.vue'
 import PrepView from '../views/PrepView.vue'
+import LaunchConfirmView from '../views/LaunchConfirmView.vue'
+import SocialView from '../views/SocialView.vue'
 
 const routes = [
+  // ── Pipeline Dashboard (new home) ──────────────────────
   {
     path: '/',
-    name: 'Home',
-    component: Home
+    name: 'Dashboard',
+    component: PipelineDashboard
   },
+
+  // ── Project pipeline routes ────────────────────────────
   {
-    path: '/projects',
-    name: 'Projects',
-    component: ProjectsView
-  },
-  {
-    path: '/process/:projectId',
-    name: 'Process',
-    component: Process,
+    path: '/project/:slug/prepare',
+    name: 'Prepare',
+    component: PrepView,
     props: true
   },
+  {
+    path: '/project/:slug/launch',
+    name: 'Launch',
+    component: LaunchConfirmView,
+    props: true
+  },
+  {
+    path: '/project/:slug/interact',
+    name: 'Interact',
+    component: SocialView,
+    props: true
+  },
+
+  // ── Legacy MiroFish routes (simulation engine) ─────────
   {
     path: '/simulation/:simulationId',
     name: 'Simulation',
@@ -49,10 +65,11 @@ const routes = [
     component: InteractionView,
     props: true
   },
+
+  // ── Backwards compat redirect ──────────────────────────
   {
     path: '/prep',
-    name: 'Prep',
-    component: PrepView
+    redirect: '/'
   }
 ]
 

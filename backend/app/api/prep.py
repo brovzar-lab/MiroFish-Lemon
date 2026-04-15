@@ -1,10 +1,12 @@
 """
-MiroFish Prep API — /api/prep
-Supports the 4-phase sim-prep studio UI.
+MiroFish Prep API — /api/prep/<slug>
+Generic, project-aware 4-phase sim-prep studio.
+All paths are dynamic per project slug.
 """
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,26 +15,116 @@ from flask import jsonify, request, send_file
 
 from . import prep_bp
 
-# Repo root — two levels up from this file
+# Repo root — three levels up from this file (backend/app/api/prep.py)
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SIM_PREP_DIR = REPO_ROOT / "sim-prep" / "oro-verde"
 SCRIPTS_DIR = REPO_ROOT / "scripts" / "mirofish-prep"
-CAST_FILE = SIM_PREP_DIR / "character_cast.json"
 
-DOWNLOADABLE_FILES = {
-    "upload_document.md": SIM_PREP_DIR / "upload_document.md",
-    "reality_seed.md": SIM_PREP_DIR / "reality_seed.md",
-    "simulation_config.json": SIM_PREP_DIR / "simulation_config.json",
-    "event_seeds.json": SIM_PREP_DIR / "event_seeds.json",
-    "preflight_report.md": SIM_PREP_DIR / "preflight_report.md",
-    "character_cast.json": CAST_FILE,
-}
+# The six output files that every prep package produces
+OUTPUT_FILENAMES = [
+    "upload_document.md",
+    "reality_seed.md",
+    "simulation_config.json",
+    "event_seeds.json",
+    "preflight_report.md",
+    "character_cast.json",
+]
+
+
+def _project_dir(slug: str) -> Path:
+    """Return (and ensure) the sim-prep directory for a given project slug."""
+    d = REPO_ROOT / "sim-prep" / slug
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _cast_path(slug: str) -> Path:
+    return _project_dir(slug) / "character_cast.json"
+
+
+def _output_paths(slug: str) -> dict[str, Path]:
+    base = _project_dir(slug)
+    return {name: base / name for name in OUTPUT_FILENAMES}
+
+
+# ─── PROJECT LIST ──────────────────────────────────────────────────────────
+
+@prep_bp.route("/projects", methods=["GET"])
+def list_prep_projects():
+    """List all projects that have a sim-prep directory."""
+    sim_prep_root = REPO_ROOT / "sim-prep"
+    if not sim_prep_root.exists():
+        return jsonify({"projects": []})
+
+    projects = []
+    for d in sorted(sim_prep_root.iterdir()):
+        if not d.is_dir() or d.name.startswith("."):
+            continue
+        cast = d / "character_cast.json"
+        meta = {
+            "slug": d.name,
+            "has_cast": cast.exists(),
+            "has_upload_doc": (d / "upload_document.md").exists(),
+            "has_seed": (d / "reality_seed.md").exists(),
+            "has_config": (d / "simulation_config.json").exists(),
+            "has_events": (d / "event_seeds.json").exists(),
+            "has_preflight": (d / "preflight_report.md").exists(),
+            "agent_count": 0,
+            "total_chars": 0,
+        }
+        # Enrich with agent count
+        if cast.exists():
+            try:
+                cdata = json.loads(cast.read_text("utf-8"))
+                meta["agent_count"] = len(cdata.get("mandatory_agents", []))
+            except (json.JSONDecodeError, KeyError):
+                pass
+        # Upload doc size
+        ud = d / "upload_document.md"
+        if ud.exists():
+            meta["total_chars"] = ud.stat().st_size
+        projects.append(meta)
+
+    return jsonify({"projects": projects})
+
+
+@prep_bp.route("/projects", methods=["POST"])
+def create_prep_project():
+    """Create a new sim-prep project directory."""
+    data = request.get_json(silent=True) or {}
+    slug = data.get("slug", "").strip().lower()
+    slug = re.sub(r"[^a-z0-9\-]", "-", slug).strip("-")
+    if not slug:
+        return jsonify({"error": "A project slug is required"}), 400
+
+    project_dir = _project_dir(slug)
+    # Create a meta.json with project info
+    meta_path = project_dir / "meta.json"
+    if not meta_path.exists():
+        meta = {
+            "slug": slug,
+            "name": data.get("name", slug.replace("-", " ").title()),
+            "language": data.get("language", "en"),
+            "duration_hours": int(data.get("duration_hours", 168)),
+            "created_at": __import__("datetime").datetime.now().isoformat(),
+        }
+        meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return jsonify({"slug": slug, "status": "created"})
+
+
+@prep_bp.route("/<slug>/meta", methods=["GET"])
+def get_project_meta(slug: str):
+    """Return project metadata."""
+    meta_path = _project_dir(slug) / "meta.json"
+    if meta_path.exists():
+        return jsonify(json.loads(meta_path.read_text("utf-8")))
+    return jsonify({"slug": slug, "name": slug.replace("-", " ").title()})
 
 
 # ─── PHASE 1: INGEST ────────────────────────────────────────────────────────
 
-@prep_bp.route("/parse", methods=["POST"])
-def parse_doc():
+@prep_bp.route("/<slug>/parse", methods=["POST"])
+def parse_doc(slug: str):
     """Accept plain text content of a doc; return word and char count."""
     data = request.get_json(silent=True) or {}
     content = data.get("content", "")
@@ -45,85 +137,91 @@ def parse_doc():
 
 # ─── PHASE 2: CAST ──────────────────────────────────────────────────────────
 
-@prep_bp.route("/cast", methods=["GET"])
-def get_cast():
-    """Return the current character_cast.json."""
-    if not CAST_FILE.exists():
-        return jsonify({"error": "character_cast.json not found"}), 404
-    with open(CAST_FILE, "r", encoding="utf-8") as f:
+@prep_bp.route("/<slug>/cast", methods=["GET"])
+def get_cast(slug: str):
+    """Return the current character_cast.json for this project."""
+    cast_file = _cast_path(slug)
+    if not cast_file.exists():
+        return jsonify({"error": "character_cast.json not found", "hint": "Upload source documents and run CAST phase first."}), 404
+    with open(cast_file, "r", encoding="utf-8") as f:
         cast = json.load(f)
     return jsonify(cast)
 
 
-@prep_bp.route("/cast", methods=["POST"])
-def save_cast():
+@prep_bp.route("/<slug>/cast", methods=["POST"])
+def save_cast(slug: str):
     """Save an updated character_cast.json (from UI edits)."""
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No data provided"}), 400
-    SIM_PREP_DIR.mkdir(parents=True, exist_ok=True)
-    with open(CAST_FILE, "w", encoding="utf-8") as f:
+    cast_file = _cast_path(slug)
+    with open(cast_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     return jsonify({"status": "saved"})
 
 
 # ─── PHASE 3: BUILD ─────────────────────────────────────────────────────────
 
-@prep_bp.route("/build", methods=["POST"])
-def build_package():
+@prep_bp.route("/<slug>/build", methods=["POST"])
+def build_package(slug: str):
     """
-    Run generate_config.py against the cast file, then report the
-    sizes of all output files. The actual file-writing was done in
-    Phase 3 BUILD; this endpoint is called from the UI to (re)generate
-    simulation_config.json and return file statuses.
+    Run generate_config.py against the cast file, report output file statuses.
+    Language and duration are read from project meta.json.
     """
-    if not CAST_FILE.exists():
+    cast_file = _cast_path(slug)
+    if not cast_file.exists():
         return jsonify({"error": "character_cast.json not found — complete CAST phase first"}), 400
+
+    # Read project meta for language/duration
+    meta_path = _project_dir(slug) / "meta.json"
+    language = "en"
+    duration = "168"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text("utf-8"))
+            language = meta.get("language", "en")
+            duration = str(meta.get("duration_hours", 168))
+        except (json.JSONDecodeError, KeyError):
+            pass
 
     # Run the config generator script
     script = SCRIPTS_DIR / "generate_config.py"
-    if not script.exists():
-        return jsonify({"error": "generate_config.py not found"}), 500
-
-    try:
-        result = subprocess.run(
-            [sys.executable, str(script), str(CAST_FILE), "--duration", "168", "--language", "es"],
-            capture_output=True, text=True, timeout=30, cwd=str(REPO_ROOT)
-        )
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Config generation timed out"}), 500
+    if script.exists():
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script), str(cast_file), "--duration", duration, "--language", language],
+                capture_output=True, text=True, timeout=30, cwd=str(REPO_ROOT)
+            )
+        except subprocess.TimeoutExpired:
+            result = type("R", (), {"returncode": 1, "stdout": "", "stderr": "timeout"})()
+    else:
+        result = type("R", (), {"returncode": 0, "stdout": "generate_config.py not found — skipped", "stderr": ""})()
 
     # Collect file statuses
+    paths = _output_paths(slug)
     files = {}
-    for name, path in DOWNLOADABLE_FILES.items():
+    for name, path in paths.items():
         if path.exists():
-            stat = path.stat()
-            files[name] = {
-                "exists": True,
-                "size_bytes": stat.st_size,
-                "size_chars": stat.st_size,  # approximation for text files
-            }
+            files[name] = {"exists": True, "size_bytes": path.stat().st_size}
         else:
             files[name] = {"exists": False}
 
     return jsonify({
         "status": "ok" if result.returncode == 0 else "warning",
-        "generator_stdout": result.stdout[-2000:] if result.stdout else "",
-        "generator_stderr": result.stderr[-500:] if result.stderr else "",
+        "generator_stdout": (result.stdout or "")[-2000:],
+        "generator_stderr": (result.stderr or "")[-500:],
         "files": files,
     })
 
 
-@prep_bp.route("/files", methods=["GET"])
-def list_files():
-    """Return current status of all output files."""
+@prep_bp.route("/<slug>/files", methods=["GET"])
+def list_files(slug: str):
+    """Return current status of all output files for this project."""
+    paths = _output_paths(slug)
     files = {}
-    for name, path in DOWNLOADABLE_FILES.items():
+    for name, path in paths.items():
         if path.exists():
-            files[name] = {
-                "exists": True,
-                "size_bytes": path.stat().st_size,
-            }
+            files[name] = {"exists": True, "size_bytes": path.stat().st_size}
         else:
             files[name] = {"exists": False}
     return jsonify({"files": files})
@@ -131,59 +229,71 @@ def list_files():
 
 # ─── PHASE 4: PREFLIGHT ─────────────────────────────────────────────────────
 
-@prep_bp.route("/validate", methods=["GET"])
-def validate():
-    """Run validate_cast.py and return its JSON output."""
-    if not CAST_FILE.exists():
+@prep_bp.route("/<slug>/validate", methods=["GET"])
+def validate(slug: str):
+    """Run validate_cast.py and return its JSON output + pollution + cost estimate."""
+    cast_file = _cast_path(slug)
+    if not cast_file.exists():
         return jsonify({"error": "character_cast.json not found"}), 404
 
+    # Read project meta
+    meta_path = _project_dir(slug) / "meta.json"
+    duration = 168
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text("utf-8"))
+            duration = int(meta.get("duration_hours", 168))
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Run validator script
     script = SCRIPTS_DIR / "validate_cast.py"
-    if not script.exists():
-        return jsonify({"error": "validate_cast.py not found"}), 500
+    validation = {"status": "SKIPPED", "checks": [], "failures": 0}
+    if script.exists():
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script), str(cast_file)],
+                capture_output=True, text=True, timeout=30, cwd=str(REPO_ROOT)
+            )
+            try:
+                validation = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                validation = {"status": "ERROR", "raw": result.stdout, "stderr": result.stderr, "checks": [], "failures": 1}
+        except subprocess.TimeoutExpired:
+            validation = {"status": "TIMEOUT", "checks": [], "failures": 1}
 
-    try:
-        result = subprocess.run(
-            [sys.executable, str(script), str(CAST_FILE)],
-            capture_output=True, text=True, timeout=30, cwd=str(REPO_ROOT)
-        )
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Validation timed out"}), 500
-
-    # validate_cast.py writes JSON to stdout
-    try:
-        validation = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        validation = {"status": "ERROR", "raw": result.stdout, "stderr": result.stderr}
-
-    # Add pollution check
-    upload_doc = SIM_PREP_DIR / "upload_document.md"
+    # Pollution check on upload doc
+    project_dir = _project_dir(slug)
+    upload_doc = project_dir / "upload_document.md"
     pollution = []
     if upload_doc.exists():
-        import re
         txt = upload_doc.read_text(encoding="utf-8")
+        # Generic pollution patterns (non-project-specific)
         blocked = {
-            "Walmart": r"\bWalmart\b",
-            "DEA (org)": r"\bDEA\b",
-            "Harvard": r"\bHarvard\b",
-            "criminal empire": r"\bcriminal empire\b",
-            "the siblings": r"the siblings\b",
+            "Chinese characters": r"[\u4e00-\u9fff]",
         }
         for label, pattern in blocked.items():
             hits = len(re.findall(pattern, txt, re.IGNORECASE))
             if hits:
                 pollution.append({"pattern": label, "hits": hits, "status": "FAIL"})
-        chinese = len(re.findall(r"[\u4e00-\u9fff]", txt))
-        if chinese:
-            pollution.append({"pattern": "Chinese characters", "hits": chinese, "status": "FAIL"})
 
-    # Cost estimate
+    # Cost estimate (dynamic based on agent count and duration)
+    agent_count = 7.5
+    if cast_file.exists():
+        try:
+            cdata = json.loads(cast_file.read_text("utf-8"))
+            agent_count = len(cdata.get("mandatory_agents", [])) or 7.5
+        except (json.JSONDecodeError, KeyError):
+            pass
+
     upload_chars = upload_doc.stat().st_size if upload_doc.exists() else 0
-    seed_chars = (SIM_PREP_DIR / "reality_seed.md").stat().st_size if (SIM_PREP_DIR / "reality_seed.md").exists() else 0
-    avg_agents = 7.5
-    rounds = 168
+    seed_path = project_dir / "reality_seed.md"
+    seed_chars = seed_path.stat().st_size if seed_path.exists() else 0
+
+    rounds = duration
     input_tokens = 3500
     output_tokens = 500
-    calls = avg_agents * rounds
+    calls = agent_count * rounds
     cost_input = (calls * input_tokens / 1_000_000) * 3.0
     cost_output = (calls * output_tokens / 1_000_000) * 15.0
     cost_report = 7.5
@@ -204,7 +314,8 @@ def validate():
             "output_usd": round(cost_output, 2),
             "report_usd": round(cost_report, 2),
             "total_usd": round(cost_total, 2),
-            "vs_s1_pct": round((cost_total / 450) * 100, 1),
+            "agent_count": int(agent_count),
+            "duration_hours": duration,
         },
         "overall": "PASS" if (
             validation.get("failures", 1) == 0 and
@@ -217,10 +328,11 @@ def validate():
 
 # ─── DOWNLOAD ───────────────────────────────────────────────────────────────
 
-@prep_bp.route("/download/<filename>", methods=["GET"])
-def download_file(filename):
+@prep_bp.route("/<slug>/download/<filename>", methods=["GET"])
+def download_file(slug: str, filename: str):
     """Serve a generated output file for download."""
-    path = DOWNLOADABLE_FILES.get(filename)
+    paths = _output_paths(slug)
+    path = paths.get(filename)
     if not path or not path.exists():
         return jsonify({"error": f"{filename} not found"}), 404
     return send_file(str(path), as_attachment=True, download_name=filename)

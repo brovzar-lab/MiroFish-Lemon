@@ -97,7 +97,7 @@
           @click="handleNextStep"
         >
           <span v-if="isGeneratingReport" class="loading-spinner-small"></span>
-          {{ isGeneratingReport ? $t('step3.generatingReportBtn') : $t('step3.startGenerateReportBtn') }}
+          {{ isGeneratingReport ? 'Generating Report...' : 'START GENERATING RESULTS REPORT' }}
           <span v-if="!isGeneratingReport" class="arrow-icon">→</span>
         </button>
       </div>
@@ -288,7 +288,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import {
   startSimulation,
   stopSimulation,
@@ -297,7 +296,6 @@ import {
 } from '../api/simulation'
 import { generateReport } from '../api/report'
 
-const { t } = useI18n()
 
 const props = defineProps({
   simulationId: String,
@@ -362,6 +360,12 @@ const redditElapsedTime = computed(() => {
 
 // Methods
 const addLog = (msg) => {
+  // Filter out noisy Zep SDK background errors that don't affect the simulation
+  if (typeof msg === 'string' && (
+    msg.includes('Atlas loading failed') ||
+    msg.includes('Map loading failed') ||
+    msg.includes('timeout of 300000ms')
+  )) return
   emit('add-log', msg)
 }
 
@@ -382,7 +386,7 @@ const resetAllState = () => {
 // 启动模拟
 const doStartSimulation = async () => {
   if (!props.simulationId) {
-    addLog(t('log.errorMissingSimId'))
+    addLog('Error: missing simulation ID')
     return
   }
 
@@ -391,7 +395,7 @@ const doStartSimulation = async () => {
   
   isStarting.value = true
   startError.value = null
-  addLog(t('log.startingDualSim'))
+  addLog('Starting dual-platform simulation...')
   emit('update-status', 'processing')
   
   try {
@@ -404,18 +408,18 @@ const doStartSimulation = async () => {
     
     if (props.maxRounds) {
       params.max_rounds = props.maxRounds
-      addLog(t('log.setMaxRounds', { rounds: props.maxRounds }))
+      addLog('Max rounds set')
     }
     
-    addLog(t('log.graphMemoryUpdateEnabled'))
+    addLog('GraphRAG memory enabled')
     
     const res = await startSimulation(params)
     
     if (res.success && res.data) {
       if (res.data.force_restarted) {
-        addLog(t('log.oldSimCleared'))
+        addLog('Previous simulation cleared')
       }
-      addLog(t('log.engineStarted'))
+      addLog('Simulation engine started')
       addLog(`  ├─ PID: ${res.data.process_pid || '-'}`)
       
       phase.value = 1
@@ -425,12 +429,12 @@ const doStartSimulation = async () => {
       startDetailPolling()
     } else {
       startError.value = res.error || '启动失败'
-      addLog(t('log.startFailed', { error: res.error || t('common.unknownError') }))
+      addLog('Start failed')
       emit('update-status', 'error')
     }
   } catch (err) {
     startError.value = err.message
-    addLog(t('log.startException', { error: err.message }))
+    addLog('Start exception')
     emit('update-status', 'error')
   } finally {
     isStarting.value = false
@@ -442,21 +446,21 @@ const handleStopSimulation = async () => {
   if (!props.simulationId) return
   
   isStopping.value = true
-  addLog(t('log.stoppingSim'))
+  addLog('Stopping simulation...')
   
   try {
     const res = await stopSimulation({ simulation_id: props.simulationId })
     
     if (res.success) {
-      addLog(t('log.simStoppedSuccess'))
+      addLog('Simulation stopped')
       phase.value = 2
       stopPolling()
       emit('update-status', 'completed')
     } else {
-      addLog(t('log.stopFailed', { error: res.error || t('common.unknownError') }))
+      addLog('Stop failed')
     }
   } catch (err) {
-    addLog(t('log.stopException', { error: err.message }))
+    addLog('Stop exception')
   } finally {
     isStopping.value = false
   }
@@ -520,9 +524,9 @@ const fetchRunStatus = async () => {
       
       if (isCompleted || platformsCompleted) {
         if (platformsCompleted && !isCompleted) {
-          addLog(t('log.allPlatformsCompleted'))
+          addLog('All platforms completed')
         }
-        addLog(t('log.simCompleted'))
+        addLog('Simulation completed ✓')
         phase.value = 2
         stopPolling()
         emit('update-status', 'completed')
@@ -643,17 +647,17 @@ const formatActionTime = (timestamp) => {
 
 const handleNextStep = async () => {
   if (!props.simulationId) {
-    addLog(t('log.errorMissingSimId'))
+    addLog('Error: missing simulation ID')
     return
   }
 
   if (isGeneratingReport.value) {
-    addLog(t('log.reportRequestSent'))
+    addLog('Report request already sent')
     return
   }
   
   isGeneratingReport.value = true
-  addLog(t('log.startingReportGen'))
+  addLog('Starting report generation...')
   
   try {
     const res = await generateReport({
@@ -663,16 +667,16 @@ const handleNextStep = async () => {
     
     if (res.success && res.data) {
       const reportId = res.data.report_id
-      addLog(t('log.reportGenTaskStarted', { reportId }))
+      addLog('Report task started')
       
       // 跳转到报告页面
       router.push({ name: 'Report', params: { reportId } })
     } else {
-      addLog(t('log.reportGenFailed', { error: res.error || t('common.unknownError') }))
+      addLog('Report generation failed')
       isGeneratingReport.value = false
     }
   } catch (err) {
-    addLog(t('log.reportGenException', { error: err.message }))
+    addLog('Report exception')
     isGeneratingReport.value = false
   }
 }
@@ -688,7 +692,7 @@ watch(() => props.systemLogs?.length, () => {
 })
 
 onMounted(() => {
-  addLog(t('log.step3Init'))
+  addLog('Step 3 initialized')
   if (props.simulationId) {
     doStartSimulation()
   }

@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - button "[ SYS.RET ] GALLERY" [ref=e4] [cursor=pointer]
+      - generic [ref=e6]: CONFRONTATION
+      - generic [ref=e7]:
+        - generic [ref=e8]: B
+        - generic [ref=e9]: Benjamín Serrano
+      - generic [ref=e10]: VS
+      - generic [ref=e11]:
+        - generic [ref=e12]: I
+        - generic [ref=e13]: Ingrid Cervantes
+      - generic [ref=e14]:
+        - text: "NEXT_TURN:"
+        - generic [ref=e15]: BENJAMÍN SERRANO
+    - generic [ref=e18]:
+      - paragraph [ref=e19]: CONFRONTATION_MODE
+      - paragraph [ref=e20]: Set the scene or ask a provocative question. Benjamín Serrano responds first.
+    - generic [ref=e22]:
+      - textbox ">_ Moderate — Benjamín Serrano responds next..." [ref=e23]
+      - button [disabled] [ref=e24]:
+        - img [ref=e25]
+  - button "Open Next.js Dev Tools" [ref=e32] [cursor=pointer]:
+    - img [ref=e33]
+  - alert [ref=e36]

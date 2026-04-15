@@ -1,0 +1,80 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: SYS.NODE // SECTOR_7G // UPLINK_ESTABLISHED
+        - generic [ref=e6]: ENCRYPTED_CHANNEL
+      - generic [ref=e7]:
+        - button "[ SYS.RET ] ALL PROJECTS" [ref=e8] [cursor=pointer]:
+          - img [ref=e9]
+          - text: "[ SYS.RET ] ALL PROJECTS"
+        - generic [ref=e12]:
+          - heading "ORO VERDE" [level=1] [ref=e13]
+          - generic [ref=e14]: "STATUS: 14 ENTITIES ONLINE // DIRECTORY_SYNCED"
+      - generic [ref=e16]:
+        - button "ALL (14)" [ref=e17] [cursor=pointer]
+        - button "SERRANO_FAMILY (6)" [ref=e18] [cursor=pointer]
+        - button "UNKNOWN (1)" [ref=e19] [cursor=pointer]
+        - button "CARTEL (3)" [ref=e20] [cursor=pointer]
+        - button "PUBLIC (2)" [ref=e21] [cursor=pointer]
+        - button "INVESTIGATORS (2)" [ref=e22] [cursor=pointer]
+      - generic [ref=e23]:
+        - generic [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]
+          - generic [ref=e28]
+          - generic [ref=e40]
+        - generic [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]
+          - generic [ref=e48]
+          - generic [ref=e60]
+        - generic [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]
+          - generic [ref=e68]
+          - generic [ref=e80]
+        - generic [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]
+          - generic [ref=e88]
+          - generic [ref=e100]
+        - generic [ref=e104] [cursor=pointer]:
+          - generic [ref=e105]
+          - generic [ref=e108]
+          - generic [ref=e120]
+        - generic [ref=e124] [cursor=pointer]:
+          - generic [ref=e125]
+          - generic [ref=e128]
+          - generic [ref=e140]
+        - generic [ref=e144] [cursor=pointer]:
+          - generic [ref=e145]
+          - generic [ref=e148]
+          - generic [ref=e160]
+        - generic [ref=e164] [cursor=pointer]:
+          - generic [ref=e165]
+          - generic [ref=e168]
+          - generic [ref=e180]
+        - generic [ref=e184] [cursor=pointer]:
+          - generic [ref=e185]
+          - generic [ref=e188]
+          - generic [ref=e200]
+        - generic [ref=e204] [cursor=pointer]:
+          - generic [ref=e205]
+          - generic [ref=e208]
+          - generic [ref=e220]
+        - generic [ref=e224] [cursor=pointer]:
+          - generic [ref=e225]
+          - generic [ref=e228]
+          - generic [ref=e240]
+        - generic [ref=e244] [cursor=pointer]:
+          - generic [ref=e245]
+          - generic [ref=e248]
+          - generic [ref=e260]
+        - generic [ref=e264] [cursor=pointer]:
+          - generic [ref=e265]
+          - generic [ref=e268]
+          - generic [ref=e280]
+        - generic [ref=e284] [cursor=pointer]:
+          - generic [ref=e285]
+          - generic [ref=e288]
+          - generic [ref=e300]
+  - button "Open Next.js Dev Tools" [ref=e309] [cursor=pointer]:
+    - img [ref=e310]
+  - alert [ref=e313]

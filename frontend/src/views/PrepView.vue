@@ -5,6 +5,9 @@
     <header class="prep-header">
       <div class="header-top">
         <div class="brand-block">
+          <router-link to="/" class="back-link" title="Back to dashboard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </router-link>
           <div class="brand-mark">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           </div>
@@ -236,7 +239,7 @@
                     <div class="session-value mono">{{ file.name }}</div>
                     <a
                       v-if="file.exists"
-                      :href="'/api/prep/download/' + file.name"
+                      :href="`/api/prep/${slug}/download/${file.name}`"
                       class="download-badge"
                       download
                     >↓ download</a>
@@ -347,27 +350,28 @@
                 </div>
                 <div class="runtime-band">
                   <div>
-                    <div class="session-label">VS SEASON 1 ACTUAL ($450)</div>
-                    <div class="session-value mono" style="color:var(--primary);">{{ preflightResult.cost_estimate?.vs_s1_pct }}% of S1 cost</div>
+                    <div class="session-label">ESTIMATED SIMULATION COST</div>
+                    <div class="session-value mono" style="color:var(--primary);">{{ preflightResult.cost_estimate?.agent_count }} agents × {{ preflightResult.cost_estimate?.duration_hours }}h</div>
                   </div>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 </div>
 
                 <div class="upload-instructions">
-                  <div class="eyebrow mono" style="margin-bottom:8px; margin-top:18px;">UPLOAD PROCEDURE</div>
-                  <ol class="instructions-list mono">
-                    <li>Paste <strong>upload_document.md</strong> → Source Material field</li>
-                    <li>Paste <strong>reality_seed.md</strong> → Simulation Requirement field</li>
-                    <li>Upload <strong>simulation_config.json</strong> as configuration</li>
-                    <li>Set 168 hours · Spanish · 12 mandatory agents</li>
-                    <li>Confirm <code>message_window_size=50</code>, <code>token_limit=150000</code></li>
-                  </ol>
+                  <div class="eyebrow mono" style="margin-bottom:8px; margin-top:18px;">NEXT STEP</div>
+                  <p class="section-copy">When preflight passes, click <strong>Launch Simulation</strong> to automatically ingest this package into MiroFish and start the simulation.</p>
                 </div>
               </div>
             </div>
 
             <div v-if="preflightResult" class="action-row" style="margin-top:16px;">
               <button class="action-btn secondary" @click="runPreflight">Re-run PREFLIGHT</button>
+              <button
+                v-if="preflightResult.overall === 'PASS'"
+                class="action-btn primary launch-btn"
+                @click="goToLaunch"
+              >
+                🚀 Launch Simulation →
+              </button>
             </div>
           </section>
 
@@ -379,7 +383,7 @@
               <div v-for="file in outputFiles" :key="file.name" class="output-card" :class="{ ready: file.exists }">
                 <div class="output-head">
                   <div class="session-value mono">{{ file.name }}</div>
-                  <a v-if="file.exists" :href="'/api/prep/download/' + file.name" class="download-badge" download>↓</a>
+                  <a v-if="file.exists" :href="`/api/prep/${slug}/download/${file.name}`" class="download-badge" download>↓</a>
                   <div v-else class="download-badge pending">pending</div>
                 </div>
                 <div class="section-copy">{{ file.description }}</div>
@@ -399,6 +403,9 @@
 <script>
 export default {
   name: 'PrepView',
+  props: {
+    slug: { type: String, required: true },
+  },
 
   data() {
     return {
@@ -411,7 +418,7 @@ export default {
         { id: 'preflight', label: 'PREFLIGHT', meta: 'validate + costs',    badge: '' },
       ],
 
-      projectName: 'Oro Verde S2',
+      projectName: '',
 
       docs: [
         { id: 'bible',     label: 'Show Bible',              hint: 'Drop show bible, PDF, or fountain export',   accept: '.md,.txt,.pdf,.fountain', wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
@@ -479,13 +486,27 @@ export default {
   },
 
   mounted() {
+    this.loadProjectMeta()
     this.loadCast()
     this.checkOutputFiles()
-    // Update phase badges
     this.updateBadges()
   },
 
   methods: {
+    async loadProjectMeta() {
+      try {
+        const res = await fetch(`/api/prep/${this.slug}/meta`)
+        if (res.ok) {
+          const meta = await res.json()
+          this.projectName = meta.name || this.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        } else {
+          this.projectName = this.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        }
+      } catch {
+        this.projectName = this.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      }
+    },
+
     updateBadges() {
       this.phases[0].badge = this.loadedDocCount ? `${this.loadedDocCount}/5` : ''
       this.phases[1].badge = this.cast.length ? `${this.activeAgentCount} agents` : ''
@@ -516,7 +537,7 @@ export default {
       doc.content = text
       // Get word count from backend or locally
       try {
-        const res = await fetch('/api/prep/parse', {
+        const res = await fetch(`/api/prep/${this.slug}/parse`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: text }),
@@ -539,7 +560,7 @@ export default {
       this.castLoading = true
       this.castError = null
       try {
-        const res = await fetch('/api/prep/cast')
+        const res = await fetch(`/api/prep/${this.slug}/cast`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
         const agents = data.mandatory_agents || []
@@ -562,7 +583,7 @@ export default {
         excluded_entities: this.excluded,
       }
       try {
-        await fetch('/api/prep/cast', {
+        await fetch(`/api/prep/${this.slug}/cast`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -603,7 +624,7 @@ export default {
         setTimeout(() => { f.progress = 30 + Math.random() * 40 }, i * 300)
       })
       try {
-        const res = await fetch('/api/prep/build', { method: 'POST' })
+        const res = await fetch(`/api/prep/${this.slug}/build`, { method: 'POST' })
         const data = await res.json()
         // Update file statuses
         for (const file of this.outputFiles) {
@@ -626,7 +647,7 @@ export default {
 
     async loadUploadDocPreview() {
       try {
-        const res = await fetch('/api/prep/download/upload_document.md')
+        const res = await fetch(`/api/prep/${this.slug}/download/upload_document.md`)
         if (res.ok) {
           this.uploadDocPreview = await res.text()
         }
@@ -635,7 +656,7 @@ export default {
 
     async checkOutputFiles() {
       try {
-        const res = await fetch('/api/prep/files')
+        const res = await fetch(`/api/prep/${this.slug}/files`)
         if (!res.ok) return
         const data = await res.json()
         let anyExists = false
@@ -660,7 +681,7 @@ export default {
       this.preflightLoading = true
       this.preflightResult = null
       try {
-        const res = await fetch('/api/prep/validate')
+        const res = await fetch(`/api/prep/${this.slug}/validate`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         this.preflightResult = await res.json()
         this.updateBadges()
@@ -669,6 +690,10 @@ export default {
       } finally {
         this.preflightLoading = false
       }
+    },
+
+    goToLaunch() {
+      this.$router.push(`/project/${this.slug}/launch`)
     },
   },
 }

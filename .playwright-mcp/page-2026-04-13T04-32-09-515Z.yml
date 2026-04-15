@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - button "[ SYS.RET ] GALLERY" [ref=e5] [cursor=pointer]
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e10]: B
+          - generic [ref=e11]:
+            - heading "Benjamín Serrano" [level=2] [ref=e12]
+            - paragraph [ref=e13]: ID:0x064 // CEO
+        - generic [ref=e14]:
+          - generic [ref=e15]: serrano family
+          - generic [ref=e16]: ENTJ
+          - generic [ref=e17]: protagonist
+          - generic [ref=e18]: AGE:35
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - heading "BIO" [level=3] [ref=e22]
+            - paragraph [ref=e23]: Middle sibling. Harvard-educated. The polished surface — the right jersey in Dallas, the pitch deck, the calculated warmth in every room — conceals a man who doesn't know who he is when no one is watching. Currently the public face of Don Ezequiel's criminal empire, performing legitimacy.
+          - generic [ref=e24]:
+            - heading "RELATIONSHIPS" [level=3] [ref=e25]
+            - generic [ref=e26]:
+              - paragraph [ref=e27]:
+                - text: Karla Serrano
+                - generic [ref=e28]: // family
+              - paragraph [ref=e29]:
+                - text: Isabela Serrano
+                - generic [ref=e30]: // family
+              - paragraph [ref=e31]:
+                - text: Carmen Serrano
+                - generic [ref=e32]: // family
+              - paragraph [ref=e33]:
+                - text: Don Ezequiel Antona
+                - generic [ref=e34]: // enemy
+              - paragraph [ref=e35]:
+                - text: Javier Cordero
+                - generic [ref=e36]: // professional
+              - paragraph [ref=e37]:
+                - text: Ingrid Cervantes
+                - generic [ref=e38]: // enemy
+              - paragraph [ref=e39]:
+                - text: Lucía Suárez
+                - generic [ref=e40]: // romantic
+              - paragraph [ref=e41]:
+                - text: Valeria Luna
+                - generic [ref=e42]: // romantic
+          - generic [ref=e43]:
+            - heading "STATS" [level=3] [ref=e44]
+            - generic [ref=e45]: ACT:0 // POST:0 // INF:3
+          - generic [ref=e47]:
+            - heading "INTERESTS" [level=3] [ref=e48]
+            - generic [ref=e49]:
+              - generic [ref=e50]: business strategy
+              - generic [ref=e51]: corporate communications
+              - generic [ref=e52]: avocado industry
+              - generic [ref=e53]: ESG
+              - generic [ref=e54]: family legacy
+              - generic [ref=e55]: Harvard alumni
+    - generic [ref=e56]:
+      - generic [ref=e57]:
+        - button "[HIDE_PROFILE]" [ref=e58] [cursor=pointer]
+        - generic [ref=e60]: B
+        - generic [ref=e61]: Benjamín Serrano
+        - generic [ref=e62]: SOLO_INTERVIEW
+        - button "MEMORY" [ref=e63] [cursor=pointer]
+      - generic [ref=e66]:
+        - generic [ref=e69]:
+          - paragraph [ref=e70]: Start a conversation
+          - paragraph [ref=e71]: Talk to Benjamín Serrano — they'll respond in character.
+        - generic [ref=e73]:
+          - textbox "Talk to Benjamín Serrano..." [ref=e74]
+          - button [disabled]:
+            - img
+  - button "Open Next.js Dev Tools" [ref=e80] [cursor=pointer]:
+    - img [ref=e81]
+  - alert [ref=e84]

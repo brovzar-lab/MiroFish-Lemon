@@ -1,0 +1,13 @@
+{
+  "status": "completed",
+  "progress": 100,
+  "message": "报告生成完成",
+  "current_section": null,
+  "completed_sections": [
+    "身份引擎：表演的演化与断裂",
+    "汇合点：外部调查的突破与触发",
+    "卡门的幽灵：被掩埋的决定如何引爆未来",
+    "不对称博弈：控制的维持与裂解"
+  ],
+  "updated_at": "2026-04-11T08:22:20.698029"
+}

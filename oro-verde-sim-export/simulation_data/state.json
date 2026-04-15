@@ -1,0 +1,28 @@
+{
+  "simulation_id": "sim_4324da26ed07",
+  "project_id": "proj_efde903adfd1",
+  "graph_id": "mirofish_3d0dcd9d54b04013",
+  "enable_twitter": true,
+  "enable_reddit": true,
+  "status": "running",
+  "entities_count": 27,
+  "profiles_count": 27,
+  "entity_types": [
+    "FamilyMember",
+    "CriminalOperator",
+    "Activist",
+    "GovernmentOfficial",
+    "Organization",
+    "BusinessExecutive",
+    "Person",
+    "Journalist"
+  ],
+  "config_generated": true,
+  "config_reasoning": "时间配置: 这是一个复杂的多线程犯罪家族剧情，涉及商业精英、记者调查、犯罪集团等多个群体的长期博弈。设定7天168小时模拟期，因为剧情需要时间让各方势力逐步碰撞、调查深入、秘密曝光。晚间20-23点为高峰期，适合商业精英的社交时间和记者的深度工作时段。工作时间延长至19点，符合高端商务人士的作息。Agent数量控制在中等水平，反映这是一个相对封闭的精英圈层故事。 | 事件配置: 基于模拟需求构建了一个多层次的舆论环境，涵盖合法商业世界、调查记者、以及了解内情的当地人群体。初始帖子反映了不同利益相关方的立场：企业高管维护声誉、记者追求真相、活动人士推动正义、普通民众的分化观点。这种设计将推动三个世界（合法、调查、犯罪）的碰撞和角色行为的自然演化。 | Agent配置: 成功生成 27 个 | 初始帖子分配: 8 个帖子已分配发布者",
+  "current_round": 0,
+  "twitter_status": "not_started",
+  "reddit_status": "not_started",
+  "created_at": "2026-04-11T03:16:05.084644",
+  "updated_at": "2026-04-11T06:11:01.071773",
+  "error": null
+}

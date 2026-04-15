@@ -566,6 +566,8 @@ class RedditSimulationRunner:
             profile_path=profile_path,
             model=model,
             available_actions=self.AVAILABLE_ACTIONS,
+            message_window_size=50,
+            token_limit=150000,
         )
         
         db_path = self._get_db_path()

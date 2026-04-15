@@ -579,6 +579,8 @@ class TwitterSimulationRunner:
             profile_path=profile_path,
             model=model,
             available_actions=self.AVAILABLE_ACTIONS,
+            message_window_size=50,
+            token_limit=150000,
         )
         
         # 数据库路径

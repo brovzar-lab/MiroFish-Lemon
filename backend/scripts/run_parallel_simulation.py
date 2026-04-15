@@ -1139,6 +1139,8 @@ async def run_twitter_simulation(
         profile_path=profile_path,
         model=model,
         available_actions=TWITTER_ACTIONS,
+        message_window_size=50,
+        token_limit=150000,
     )
     
     # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
@@ -1330,6 +1332,8 @@ async def run_reddit_simulation(
         profile_path=profile_path,
         model=model,
         available_actions=REDDIT_ACTIONS,
+        message_window_size=50,
+        token_limit=150000,
     )
     
     # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
