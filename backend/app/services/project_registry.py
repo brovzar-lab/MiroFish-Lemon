@@ -63,11 +63,35 @@ def _save_registry(projects: list) -> None:
 
 def list_projects() -> list:
     """
-    Return all registered projects, sorted by creation date descending.
+    Return all projects, sorted by creation date descending.
 
-    Each entry: {slug, name, created_at, has_cast, has_upload_doc, has_config}
+    Merges registered projects (projects.json) with any directories under
+    sim-prep/ that contain canonical artifacts but were created before the
+    registry existed (e.g. the original oro-verde package).
+
+    Each entry: {slug, name, created_at, has_cast, has_upload_doc, has_config, ...}
     """
     projects = _load_registry()
+    registered_slugs = {p.get("slug", "") for p in projects}
+
+    # Auto-discover legacy directories that aren't in the registry
+    if SIM_PREP_ROOT.exists():
+        for child in SIM_PREP_ROOT.iterdir():
+            if not child.is_dir() or child.name in registered_slugs:
+                continue
+            if child.name.startswith(".") or child.name.startswith("_"):
+                continue
+            # Heuristic: real project directories have at least one canonical file
+            if any((child / fname).exists() for fname in (
+                "character_cast.json", "upload_document.md", "simulation_config.json"
+            )):
+                projects.append({
+                    "slug": child.name,
+                    "name": child.name.replace("-", " ").title(),
+                    "created_at": _iso_from_mtime(child),
+                    "_legacy": True,
+                })
+
     enriched = []
     for p in projects:
         slug = p.get("slug", "")
@@ -172,3 +196,13 @@ def _iso_now() -> str:
     """Return current UTC time as ISO 8601 string."""
     import datetime
     return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _iso_from_mtime(path: Path) -> str:
+    """Return a directory's modification time as ISO 8601 string."""
+    import datetime
+    try:
+        ts = path.stat().st_mtime
+        return datetime.datetime.utcfromtimestamp(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except OSError:
+        return _iso_now()
