@@ -5,7 +5,6 @@ import SimulationView from '../views/SimulationView.vue'
 import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
-import ProjectsView from '../views/ProjectsView.vue'
 import PrepView from '../views/PrepView.vue'
 
 const routes = [
@@ -13,11 +12,6 @@ const routes = [
     path: '/',
     name: 'Home',
     component: Home
-  },
-  {
-    path: '/projects',
-    name: 'Projects',
-    component: ProjectsView
   },
   {
     path: '/process/:projectId',
