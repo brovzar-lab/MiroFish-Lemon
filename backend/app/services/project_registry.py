@@ -92,29 +92,48 @@ def list_projects() -> list:
                     "_legacy": True,
                 })
 
-    enriched = []
-    for p in projects:
-        slug = p.get("slug", "")
-        d = project_dir(slug)
-        enriched.append({
-            **p,
-            "has_cast": (d / "character_cast.json").exists(),
-            "has_upload_doc": (d / "upload_document.md").exists(),
-            "has_reality_seed": (d / "reality_seed.md").exists(),
-            "has_config": (d / "simulation_config.json").exists(),
-            "has_event_seeds": (d / "event_seeds.json").exists(),
-            "has_preflight": (d / "preflight_report.md").exists(),
-            "source_count": len(list((d / "_sources").glob("*"))) if (d / "_sources").exists() else 0,
-        })
+    enriched = [_enrich(p) for p in projects]
     return sorted(enriched, key=lambda p: p.get("created_at", ""), reverse=True)
 
 
 def get_project(slug: str) -> Optional[dict]:
-    """Return a single project by slug, or None if not found."""
-    for p in list_projects():
-        if p["slug"] == slug:
-            return p
+    """Return a single project by slug, or None if not found.
+
+    Enriches only the requested project (avoids scanning every other project's
+    directory for file-status flags).
+    """
+    for p in _load_registry():
+        if p.get("slug") == slug:
+            return _enrich(p)
+
+    # Fallback: legacy directory not in registry
+    d = project_dir(slug)
+    if d.exists() and any((d / f).exists() for f in (
+        "character_cast.json", "upload_document.md", "simulation_config.json"
+    )):
+        return _enrich({
+            "slug": slug,
+            "name": slug.replace("-", " ").title(),
+            "created_at": _iso_from_mtime(d),
+            "_legacy": True,
+        })
+
     return None
+
+
+def _enrich(p: dict) -> dict:
+    """Annotate a project entry with file-existence flags and source count."""
+    d = project_dir(p.get("slug", ""))
+    return {
+        **p,
+        "has_cast": (d / "character_cast.json").exists(),
+        "has_upload_doc": (d / "upload_document.md").exists(),
+        "has_reality_seed": (d / "reality_seed.md").exists(),
+        "has_config": (d / "simulation_config.json").exists(),
+        "has_event_seeds": (d / "event_seeds.json").exists(),
+        "has_preflight": (d / "preflight_report.md").exists(),
+        "source_count": len(list((d / "_sources").glob("*"))) if (d / "_sources").exists() else 0,
+    }
 
 
 def create_project(name: str) -> str:
@@ -151,7 +170,7 @@ def create_project(name: str) -> str:
     projects.append({
         "slug": slug,
         "name": name,
-        "created_at": _iso_now(),
+        "created_at": iso_now(),
     })
     _save_registry(projects)
 
@@ -192,7 +211,7 @@ def ensure_project_dirs(slug: str) -> None:
     (project_dir(slug) / "_draft").mkdir(parents=True, exist_ok=True)
 
 
-def _iso_now() -> str:
+def iso_now() -> str:
     """Return current UTC time as ISO 8601 string."""
     import datetime
     return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -205,4 +224,4 @@ def _iso_from_mtime(path: Path) -> str:
         ts = path.stat().st_mtime
         return datetime.datetime.utcfromtimestamp(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
     except OSError:
-        return _iso_now()
+        return iso_now()

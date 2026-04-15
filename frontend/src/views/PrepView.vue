@@ -49,7 +49,7 @@
               <div class="step-meta">{{ phase.meta }}</div>
             </div>
           </div>
-          <div class="step-badge mono">{{ phase.badge }}</div>
+          <div class="step-badge mono">{{ phaseBadges[phase.id] }}</div>
         </button>
       </div>
     </header>
@@ -567,16 +567,15 @@ export default {
       activePhase: 'project',
 
       phases: [
-        { id: 'project',   label: 'PROJECT',   meta: 'pick or create',      badge: '' },
-        { id: 'ingest',    label: 'INGEST',    meta: 'source docs',         badge: '' },
-        { id: 'cast',      label: 'CAST',      meta: 'AI extraction',       badge: '' },
-        { id: 'build',     label: 'BUILD',     meta: 'AI generation',       badge: '' },
-        { id: 'preflight', label: 'PREFLIGHT', meta: 'validate + costs',    badge: '' },
+        { id: 'project',   label: 'PROJECT',   meta: 'pick or create' },
+        { id: 'ingest',    label: 'INGEST',    meta: 'source docs' },
+        { id: 'cast',      label: 'CAST',      meta: 'AI extraction' },
+        { id: 'build',     label: 'BUILD',     meta: 'AI generation' },
+        { id: 'preflight', label: 'PREFLIGHT', meta: 'validate + costs' },
       ],
 
       // Project picker (Phase 0)
       activeProject: null,          // slug string once selected
-      projectName: 'No project',
       projects: [],
       projectsLoading: false,
       newProjectName: '',
@@ -610,7 +609,6 @@ export default {
         { kind: 'config',          filename: 'simulation_config.json', description: 'Behavioral profiles + cost controls (message_window_size=50, token_limit=150000).', colorClass: 'primary' },
       ],
       artifactStatus: {},           // keyed by kind: { generating, promoting, preview, charCount, hasCanonical, hasDraft, error }
-      configBuildRunning: false,
 
       // Preflight
       preflightLoading: false,
@@ -621,12 +619,6 @@ export default {
   },
 
   computed: {
-    totalWords() {
-      return this.docs.reduce((s, d) => s + d.wordCount, 0)
-    },
-    totalChars() {
-      return this.docs.reduce((s, d) => s + d.charCount, 0)
-    },
     loadedDocCount() {
       return this.docs.filter(d => d.loaded).length
     },
@@ -639,8 +631,15 @@ export default {
     allArtifactsPromoted() {
       return this.artifactKinds.every(a => this.artifactStatus[a.kind]?.hasCanonical)
     },
-    hasAnyDraft() {
-      return this.artifactKinds.some(a => this.artifactStatus[a.kind]?.hasDraft)
+    phaseBadges() {
+      const promoted = this.artifactKinds.filter(a => this.artifactStatus[a.kind]?.hasCanonical).length
+      return {
+        project:   this.activeProject || '',
+        ingest:    this.loadedDocCount ? `${this.loadedDocCount}/3` : '',
+        cast:      this.cast.length ? `${this.activeAgentCount} agents` : '',
+        build:     promoted ? `${promoted}/${this.artifactKinds.length}` : '',
+        preflight: this.preflightResult?.overall || '',
+      }
     },
     packageState() {
       if (!this.activeProject) return 'No project selected'
@@ -666,12 +665,10 @@ export default {
 
   mounted() {
     this.loadProjects()
-    // Restore active project from localStorage
     const saved = localStorage.getItem('prepActiveProject')
     if (saved) {
       this.activeProject = saved
     }
-    this.updateBadges()
   },
 
   watch: {
@@ -687,15 +684,6 @@ export default {
   },
 
   methods: {
-    updateBadges() {
-      this.phases[0].badge = this.activeProject ? this.activeProject : ''
-      this.phases[1].badge = this.loadedDocCount ? `${this.loadedDocCount}/3` : ''
-      this.phases[2].badge = this.cast.length ? `${this.activeAgentCount} agents` : ''
-      const promotedCount = this.artifactKinds.filter(a => this.artifactStatus[a.kind]?.hasCanonical).length
-      this.phases[3].badge = promotedCount ? `${promotedCount}/${this.artifactKinds.length}` : ''
-      this.phases[4].badge = this.preflightResult?.overall || ''
-    },
-
     // ── PROJECT PICKER ─────────────────────────────────────────
     async loadProjects() {
       this.projectsLoading = true
@@ -729,7 +717,6 @@ export default {
         await this.loadProjects()
         this.activeProject = data.slug
         const proj = this.projects.find(p => p.slug === data.slug)
-        if (proj) this.projectName = proj.name
       } catch (e) {
         this.projectError = `Could not create project: ${e.message}`
       } finally {
@@ -740,7 +727,6 @@ export default {
     selectProject(slug) {
       this.activeProject = slug
       const proj = this.projects.find(p => p.slug === slug)
-      this.projectName = proj ? proj.name : slug
       this.activePhase = 'ingest'
     },
 
@@ -767,7 +753,6 @@ export default {
         this.loadCast(),
         this.loadFileStatus(),
       ])
-      this.updateBadges()
     },
 
     async loadSources() {
@@ -863,7 +848,6 @@ export default {
         doc.loaded = false
       } finally {
         doc.uploading = false
-        this.updateBadges()
       }
     },
 
@@ -900,7 +884,6 @@ export default {
         const agents = data.mandatory_agents || []
         this.cast = agents.map(a => ({ ...a, _agentOn: true }))
         this.excluded = data.excluded_entities || []
-        this.updateBadges()
       } catch (e) {
         this.castError = `Could not load cast: ${e.message}`
       } finally {
@@ -944,7 +927,6 @@ export default {
         const draftCast = this.aiCastResult.cast || {}
         this.cast = (draftCast.mandatory_agents || []).map(a => ({ ...a, _agentOn: true }))
         this.excluded = draftCast.excluded_entities || []
-        this.updateBadges()
       } catch (e) {
         this.castError = `AI extraction failed: ${e.message}`
       } finally {
@@ -959,7 +941,6 @@ export default {
         const res = await fetch(`${this.apiBase}/promote/cast`, { method: 'POST' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         await this.loadFileStatus()
-        this.updateBadges()
       } catch (e) {
         this.castError = `Promote failed: ${e.message}`
       } finally {
@@ -1031,7 +1012,6 @@ export default {
     async generateConfig() {
       if (!this.activeProject) return
       this._setArtifactStatus('config', { generating: true, error: null })
-      this.configBuildRunning = true
       try {
         const res = await fetch(`${this.apiBase}/build`, {
           method: 'POST',
@@ -1043,7 +1023,6 @@ export default {
       } catch (e) {
         this._setArtifactStatus('config', { error: e.message })
       } finally {
-        this.configBuildRunning = false
         this._setArtifactStatus('config', { generating: false })
       }
     },
@@ -1063,7 +1042,6 @@ export default {
         if (kind === 'upload-document') {
           await this.loadUploadDocPreview()
         }
-        this.updateBadges()
       } catch (e) {
         this._setArtifactStatus(kind, { error: e.message })
       } finally {
@@ -1104,7 +1082,6 @@ export default {
         const res = await fetch(`${this.apiBase}/validate`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         this.preflightResult = await res.json()
-        this.updateBadges()
       } catch (e) {
         this.preflightResult = { overall: 'ERROR', error: e.message }
       } finally {
