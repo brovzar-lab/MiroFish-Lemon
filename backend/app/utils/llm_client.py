@@ -90,14 +90,36 @@ class LLMClient:
             max_tokens=max_tokens,
             response_format={"type": "json_object"}
         )
-        # 清理markdown代码块标记
-        cleaned_response = response.strip()
-        cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
-        cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
-        cleaned_response = cleaned_response.strip()
+        cleaned = response.strip()
+        # Strip markdown code fences
+        cleaned = re.sub(r'^```(?:json)?\s*\n?', '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+        cleaned = cleaned.strip()
 
         try:
-            return json.loads(cleaned_response)
+            return json.loads(cleaned)
         except json.JSONDecodeError:
-            raise ValueError(f"LLM返回的JSON格式无效: {cleaned_response}")
+            pass
+
+        # LLM may wrap JSON in explanation text or code blocks mid-response
+        fence = re.search(r'```(?:json)?\s*\n([\s\S]*?)\n```', response)
+        if fence:
+            try:
+                return json.loads(fence.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+
+        # Last resort: find the first { ... } or [ ... ] block
+        for start_char, end_char in [('{', '}'), ('[', ']')]:
+            start = response.find(start_char)
+            if start == -1:
+                continue
+            end = response.rfind(end_char)
+            if end > start:
+                try:
+                    return json.loads(response[start:end + 1])
+                except json.JSONDecodeError:
+                    pass
+
+        raise ValueError(f"LLM返回的JSON格式无效: {cleaned[:500]}")
 
