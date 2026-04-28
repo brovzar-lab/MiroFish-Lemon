@@ -627,18 +627,48 @@ const loadProject = async () => {
     if (response.success) {
       projectData.value = response.data
       updatePhaseByStatus(response.data.status)
-      
+
+      // status='created' (no ontology yet) — common when arriving from
+      // /api/launch/<slug> auto-ingest. Trigger ontology generation against
+      // the project's already-saved extracted_text, then continue with
+      // the existing flow (which auto-starts graph build).
+      if (response.data.status === 'created' && !response.data.ontology) {
+        currentPhase.value = 0
+        ontologyProgress.value = { message: 'Generating ontology from upload document…' }
+        try {
+          const r = await fetch(`/api/graph/ontology/generate-existing/${currentProjectId.value}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          })
+          const data = await r.json()
+          if (!r.ok || !data.success) {
+            throw new Error(data.error || `HTTP ${r.status}`)
+          }
+          // Refetch the project so projectData reflects ontology + new status
+          const refreshed = await getProject(currentProjectId.value)
+          if (refreshed.success) projectData.value = refreshed.data
+          ontologyProgress.value = null
+          // Now auto-start graph build
+          await startBuildGraph()
+        } catch (err) {
+          ontologyProgress.value = null
+          error.value = `Ontology generation failed: ${err.message}`
+          return
+        }
+      }
+
       // 自动开始图谱构建
       if (response.data.status === 'ontology_generated' && !response.data.graph_id) {
         await startBuildGraph()
       }
-      
+
       // 继续轮询构建中的任务
       if (response.data.status === 'graph_building' && response.data.graph_build_task_id) {
         currentPhase.value = 1
         startPollingTask(response.data.graph_build_task_id)
       }
-      
+
       // 加载已完成的图谱
       if (response.data.status === 'graph_completed' && response.data.graph_id) {
         currentPhase.value = 2

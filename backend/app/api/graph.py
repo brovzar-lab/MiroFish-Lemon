@@ -255,6 +255,95 @@ def generate_ontology():
         }), 500
 
 
+# ============== 接口1.5：基于已有项目生成本体 ==============
+
+@graph_bp.route('/ontology/generate-existing/<project_id>', methods=['POST'])
+def generate_ontology_existing(project_id: str):
+    """
+    Generate ontology for a project that ALREADY has source text saved
+    (no file upload). Used by the auto-ingest /api/launch/<slug> flow:
+    the launch endpoint creates a project and saves extracted_text from
+    the curated upload_document.md, then this endpoint runs the LLM-based
+    ontology generation against that text.
+
+    Without this endpoint, projects created via /api/launch/* are stuck
+    in status='created' with no UI path to advance — Process.vue's
+    loadProject only auto-builds graphs when ontology already exists.
+
+    Request body (optional JSON): {"additional_context": "..."}
+    """
+    try:
+        project = ProjectManager.load_project(project_id)
+        if not project:
+            return jsonify({"success": False, "error": "Project not found"}), 404
+
+        if project.ontology and project.ontology.get("entity_types"):
+            return jsonify({
+                "success": True,
+                "data": {
+                    "project_id": project.project_id,
+                    "ontology": project.ontology,
+                    "analysis_summary": project.analysis_summary,
+                    "already_generated": True,
+                }
+            })
+
+        text = ProjectManager.get_extracted_text(project_id)
+        if not text:
+            return jsonify({
+                "success": False,
+                "error": "Project has no extracted_text. Re-launch from sim-prep."
+            }), 400
+
+        if not project.simulation_requirement:
+            return jsonify({
+                "success": False,
+                "error": "Project has no simulation_requirement set."
+            }), 400
+
+        body = request.get_json(silent=True) or {}
+        additional_context = body.get("additional_context", "")
+
+        logger.info(f"Generating ontology for existing project {project_id} ({len(text):,} chars)")
+        generator = OntologyGenerator()
+        ontology = generator.generate(
+            document_texts=[text],
+            simulation_requirement=project.simulation_requirement,
+            additional_context=additional_context if additional_context else None,
+        )
+
+        entity_count = len(ontology.get("entity_types", []))
+        edge_count = len(ontology.get("edge_types", []))
+        logger.info(f"Ontology generated: {entity_count} entity types, {edge_count} edge types")
+
+        project.ontology = {
+            "entity_types": ontology.get("entity_types", []),
+            "edge_types": ontology.get("edge_types", []),
+        }
+        project.analysis_summary = ontology.get("analysis_summary", "")
+        project.status = ProjectStatus.ONTOLOGY_GENERATED
+        ProjectManager.save_project(project)
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "project_id": project.project_id,
+                "project_name": project.name,
+                "ontology": project.ontology,
+                "analysis_summary": project.analysis_summary,
+                "total_text_length": project.total_text_length,
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"generate_ontology_existing failed: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }), 500
+
+
 # ============== 接口2：构建图谱 ==============
 
 @graph_bp.route('/build', methods=['POST'])
