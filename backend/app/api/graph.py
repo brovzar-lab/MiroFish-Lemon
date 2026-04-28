@@ -273,7 +273,7 @@ def generate_ontology_existing(project_id: str):
     Request body (optional JSON): {"additional_context": "..."}
     """
     try:
-        project = ProjectManager.load_project(project_id)
+        project = ProjectManager.get_project(project_id)
         if not project:
             return jsonify({"success": False, "error": "Project not found"}), 404
 
