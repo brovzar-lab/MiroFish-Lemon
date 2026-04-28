@@ -160,16 +160,19 @@ export default {
 
         const data = await res.json()
         this.launchProgress = 100
-        this.launchStatus = 'Simulation started!'
+        this.launchStatus = 'Project created — opening MiroFish workspace…'
 
-        // Redirect to simulation monitor
+        // Redirect into the MiroFish workspace so the user can watch
+        // the knowledge graph build and trigger the simulation.
         setTimeout(() => {
           if (data.simulation_id) {
             this.$router.push(`/simulation/${data.simulation_id}/start`)
+          } else if (data.project_id) {
+            this.$router.push({ name: 'Process', params: { projectId: data.project_id } })
           } else {
-            this.launchStatus = 'Package ingested. Navigate to MiroFish to start simulation.'
+            this.launchStatus = 'Package ingested. Navigate to / to find your project.'
           }
-        }, 1500)
+        }, 1200)
       } catch (e) {
         this.launchError = e.message
         this.launching = false

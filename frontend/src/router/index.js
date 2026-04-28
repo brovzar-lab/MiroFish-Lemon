@@ -12,6 +12,11 @@ import PrepView from '../views/PrepView.vue'
 import LaunchConfirmView from '../views/LaunchConfirmView.vue'
 import SocialView from '../views/SocialView.vue'
 
+// MiroFish workflow views (knowledge graph build, projects browse)
+import Process from '../views/Process.vue'
+import MainView from '../views/MainView.vue'
+import ProjectsView from '../views/ProjectsView.vue'
+
 const routes = [
   // ── Pipeline Dashboard (new home) ──────────────────────
   {
@@ -38,6 +43,27 @@ const routes = [
     name: 'Interact',
     component: SocialView,
     props: true
+  },
+
+  // ── MiroFish workflow (graph build, projects, upload) ──
+  // Process.vue is the live knowledge-graph view used as Step 1
+  // (graph building) and as the post-launch landing page where the
+  // user watches entities/edges materialize in real time.
+  {
+    path: '/build/:projectId',
+    name: 'Process',
+    component: Process,
+    props: true
+  },
+  {
+    path: '/upload',
+    name: 'MainView',
+    component: MainView
+  },
+  {
+    path: '/projects',
+    name: 'Projects',
+    component: ProjectsView
   },
 
   // ── Legacy MiroFish routes (simulation engine) ─────────
