@@ -435,6 +435,115 @@ GUIDELINES:
 - No group references — every event has one named character at its center."""
 
 
+def _scrub_pollution(text: str, cast_data: dict) -> dict:
+    """
+    Deterministic post-processing pass on the LLM-generated upload document.
+
+    The LLM follows the rules ~80% of the way but leaves residue. This pass
+    enforces zero-tolerance via regex driven by the cast itself:
+
+    1. Detect family groups (agents sharing a surname) and replace generic
+       group references ("the siblings", "the family", "the Serranos") with
+       the joined first names ("Benjamín, Karla, and Isabela").
+    2. Hard-replace organization/abstract patterns ("criminal empire",
+       "narco operation") with neutral descriptors.
+    3. If exactly one excluded entity exists, mark its name with [DECEASED]
+       inline so Zep classifies it as a historical reference.
+
+    Returns: {"text": cleaned_text, "replacements": {pattern: count, ...}}
+    """
+    from collections import defaultdict
+
+    replacements = {}
+
+    def sub_count(pattern: str, replacement: str, src: str, flags=re.IGNORECASE) -> str:
+        nonlocal replacements
+        new_src, n = re.subn(pattern, replacement, src, flags=flags)
+        if n > 0:
+            replacements[pattern] = replacements.get(pattern, 0) + n
+        return new_src
+
+    # 1. Build family map from cast
+    families = defaultdict(list)
+    for agent in cast_data.get("mandatory_agents", []):
+        name = agent.get("name", "").strip()
+        parts = name.split()
+        if len(parts) >= 2:
+            families[parts[-1]].append(parts[0])
+
+    # Compound-noun whitelist: "the family business" etc. are safe — the noun
+    # is "business", not "family". Don't substitute when followed by these.
+    SAFE_NEXT_NOUNS = (
+        "business|name|estate|hacienda|home|history|tradition|fortune|wealth|"
+        "archive|legacy|honor|reputation|empire|operation|company|enterprise"
+    )
+    safe_lookahead = rf"(?!\s+(?:{SAFE_NEXT_NOUNS})\b)"
+
+    # 2. Cast-driven replacements per family
+    for surname, first_names in families.items():
+        if len(first_names) < 2:
+            continue
+        if len(first_names) == 2:
+            joined = f"{first_names[0]} and {first_names[1]}"
+        else:
+            joined = ", ".join(first_names[:-1]) + f", and {first_names[-1]}"
+
+        sn_re = re.escape(surname)
+        # Sibling/three-sibling forms are always group references — replace freely
+        text = sub_count(rf"\bthe three {sn_re} siblings\b", joined, text)
+        text = sub_count(rf"\bthe {sn_re} siblings\b", joined, text)
+        text = sub_count(rf"\b{sn_re} siblings\b", joined, text)
+        # "The Serrano family X" where X is a compound noun → leave alone.
+        # Otherwise replace "the Serrano family" with names.
+        text = sub_count(rf"\bthe {sn_re} family\b{safe_lookahead}", joined, text)
+        # "the Serranos" alone (without compound noun) → names
+        text = sub_count(rf"\bthe {sn_re}s\b{safe_lookahead}", joined, text)
+
+    # 3. Generic group references (use the LARGEST family detected)
+    main_family = max(families.items(), key=lambda kv: len(kv[1]), default=(None, []))
+    if main_family[0] and len(main_family[1]) >= 2:
+        first_names = main_family[1]
+        if len(first_names) == 2:
+            joined = f"{first_names[0]} and {first_names[1]}"
+        else:
+            joined = ", ".join(first_names[:-1]) + f", and {first_names[-1]}"
+
+        text = sub_count(r"\bthe three siblings\b", joined, text)
+        text = sub_count(r"\bthe siblings\b", joined, text)
+        # "the family X" where X is a compound noun → leave alone
+        text = sub_count(rf"\bthe family\b{safe_lookahead}", f"the {main_family[0]}s", text)
+        # Possessive form: "the family's" → "the Serranos'"
+        text = sub_count(r"\bthe family's\b", f"the {main_family[0]}s'", text)
+
+    # 4. Hard replacements (always-bad terms regardless of project).
+    # Match the leading article so we don't end up with "the the operation".
+    HARD_PATTERNS = [
+        (r"\bthe\s+criminal\s+empire\b", "the operation"),
+        (r"\bcriminal\s+empire\b", "the operation"),
+        (r"\bthe\s+narco\s+operation\b", "the operation"),
+        (r"\bnarco\s+operation\b", "the operation"),
+        (r"\bthe\s+criminal\s+operation\b", "the operation"),
+        (r"\bcriminal\s+operation\b", "the operation"),
+        (r"\bthe\s+criminal\s+organization\b", "the operation"),
+    ]
+    for pat, repl in HARD_PATTERNS:
+        text = sub_count(pat, repl, text)
+
+    # 5. Mark excluded entity names with [DECEASED] on every reference
+    # so Zep classifies them as historical, not active. Skip names already
+    # followed by "[DECEASED]" to avoid double-tagging.
+    for ex in cast_data.get("excluded_entities", []):
+        name = ex.get("name", "").strip()
+        if not name:
+            continue
+        # Replace bare name with name + [DECEASED] when not already tagged
+        # Use a negative lookahead to avoid re-tagging
+        pattern = rf"\b{re.escape(name)}\b(?!\s*\[DECEASED\])"
+        text = sub_count(pattern, f"{name} [DECEASED]", text, flags=0)
+
+    return {"text": text, "replacements": replacements}
+
+
 def _read_combined_sources(slug: str, max_chars: int = 80_000) -> str:
     """Read all source docs for a project, concatenated, capped at max_chars."""
     sources_dir = _project_dir(slug) / "sources"
@@ -486,7 +595,9 @@ def _generate_upload_doc(slug: str, sources: str, cast_data: dict) -> tuple[bool
         # Strip code fences if the LLM wrapped in ```markdown blocks
         result = re.sub(r'^```(?:markdown|md)?\s*\n', '', result.strip(), flags=re.IGNORECASE)
         result = re.sub(r'\n```\s*$', '', result)
-        return True, result.strip()
+        # Deterministic post-process: scrub pollution residue the LLM left in
+        scrubbed = _scrub_pollution(result.strip(), cast_data)
+        return True, scrubbed["text"]
     except Exception as e:
         return False, str(e)
 
@@ -517,7 +628,9 @@ def _generate_reality_seed(slug: str, sources: str, cast_data: dict) -> tuple[bo
         )
         result = re.sub(r'^```(?:markdown|md)?\s*\n', '', result.strip(), flags=re.IGNORECASE)
         result = re.sub(r'\n```\s*$', '', result)
-        return True, result.strip()
+        # Same pollution scrub as upload_document — reality_seed is also entity-fed
+        scrubbed = _scrub_pollution(result.strip(), cast_data)
+        return True, scrubbed["text"]
     except Exception as e:
         return False, str(e)
 
