@@ -71,13 +71,13 @@
                 <div class="eyebrow mono">PHASE 01 / INGEST</div>
                 <div class="section-title serif">Source documents laid out like working pages.</div>
               </div>
-              <div class="doc-state mono" :class="{ ready: allDocsLoaded }">
-                <svg v-if="allDocsLoaded" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="doc-state mono" :class="{ ready: canAdvance }">
+                <svg v-if="canAdvance" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                {{ allDocsLoaded ? 'all imports clean' : `${loadedDocCount}/5 loaded` }}
+                {{ canAdvance ? `${loadedDocCount}/5 loaded — ready` : 'awaiting at least one source' }}
               </div>
             </div>
-            <p class="section-copy">Drop each source document into its tile. The studio will parse word count, check character limits, and flag any encoding issues before advancing to CAST.</p>
+            <p class="section-copy">Drop whatever source documents you have into the matching tiles. <strong>You only need one</strong> — the AI will infer the rest from what you provide. More inputs = richer extraction, but a single show bible or screenplay is enough to advance.</p>
 
             <div class="doc-grid">
               <div
@@ -121,10 +121,10 @@
 
             <button
               class="action-btn primary"
-              :disabled="!allDocsLoaded"
+              :disabled="!canAdvance"
               @click="activePhase = 'cast'"
             >
-              Advance to CAST →
+              {{ canAdvance ? `Advance to CAST with ${loadedDocCount} source${loadedDocCount === 1 ? '' : 's'} →` : 'Advance to CAST →' }}
             </button>
           </section>
 
@@ -421,11 +421,11 @@ export default {
       projectName: '',
 
       docs: [
-        { id: 'bible',     label: 'Show Bible',              hint: 'Drop show bible, PDF, or fountain export',   accept: '.md,.txt,.pdf,.fountain', wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'synopsis',  label: 'Pilot Synopsis',          hint: 'Drop outline, treatment, or synopsis draft', accept: '.md,.txt,.pdf,.docx',     wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'protocol',  label: 'Interrogation Protocol',  hint: 'Prompt routines and interviewer constraints', accept: '.md,.txt',                wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'seed',      label: 'Seed Prompt',             hint: 'Core world seed, formatting rules, voice bias', accept: '.md,.txt',             wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
-        { id: 'handoff',   label: 'Handoff Doc',             hint: 'Producer notes, decisions, phase log',       accept: '.md,.txt,.pdf',           wide: true,  loaded: false, filename: '', wordCount: 0, content: '', dragging: false },
+        { id: 'bible',     label: 'Show Bible',              hint: 'Show bible, PDF, or fountain export — recommended primary',   accept: '.md,.txt,.pdf,.fountain', wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
+        { id: 'synopsis',  label: 'Pilot Synopsis',          hint: 'Optional — outline, treatment, or synopsis draft', accept: '.md,.txt,.pdf,.docx',     wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
+        { id: 'protocol',  label: 'Interrogation Protocol',  hint: 'Optional — character interrogation or psych analysis', accept: '.md,.txt',                wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
+        { id: 'seed',      label: 'Seed Prompt',             hint: 'Optional — short simulation requirement prompt', accept: '.md,.txt',             wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
+        { id: 'handoff',   label: 'Handoff Doc',             hint: 'Optional — producer notes, decisions, phase log',       accept: '.md,.txt,.pdf',           wide: true,  loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
       ],
 
       // Cast
@@ -463,6 +463,10 @@ export default {
     },
     allDocsLoaded() {
       return this.docs.every(d => d.loaded)
+    },
+    canAdvance() {
+      // Minimum viable input: one source doc with content. The AI infers the rest.
+      return this.loadedDocCount > 0
     },
     activeAgentCount() {
       return this.cast.filter(a => a._agentOn).length
