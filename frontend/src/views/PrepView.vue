@@ -232,7 +232,7 @@
                 <div class="eyebrow mono">PHASE 03 / BUILD</div>
                 <div class="section-title serif">Live draft on the left, package outputs stacked right.</div>
               </div>
-              <div class="toolbar-chip mono">{{ buildRunning ? 'generating…' : 'ready to build' }}</div>
+              <div class="toolbar-chip mono">{{ buildRunning ? 'generating… (60-90s, 3 parallel AI calls)' : (buildComplete ? 'build complete' : 'ready to build') }}</div>
             </div>
 
             <div class="build-split">
@@ -280,8 +280,14 @@
 
             <div class="action-row">
               <button class="action-btn primary" :disabled="buildRunning" @click="runBuild">
-                {{ buildRunning ? 'Building…' : 'Run BUILD' }}
+                {{ buildRunning ? 'Building… (60-90s)' : (buildComplete ? 'Re-run BUILD' : 'Run BUILD') }}
               </button>
+              <div v-if="buildErrors" class="error-state mono" style="margin-top:14px;">
+                <strong>Some generators failed:</strong>
+                <ul style="margin:6px 0 0 20px;padding:0;">
+                  <li v-for="(msg, key) in buildErrors" :key="key">{{ key }}: {{ String(msg).slice(0, 200) }}</li>
+                </ul>
+              </div>
               <button class="action-btn secondary" :disabled="!buildComplete" @click="activePhase = 'preflight'">
                 Advance to PREFLIGHT →
               </button>
@@ -460,6 +466,7 @@ export default {
       // Build
       buildRunning: false,
       buildComplete: false,
+      buildErrors: null,
       uploadDocPreview: null,
       outputFiles: [
         { name: 'upload_document.md',   description: 'Full character bible and world context for the MiroFish upload field.', exists: false, progress: 0, colorClass: 'success' },
@@ -729,27 +736,35 @@ export default {
     // ── BUILD ──────────────────────────────────────────────────
     async runBuild() {
       this.buildRunning = true
-      // Animate progress bars
-      this.outputFiles.forEach((f, i) => {
-        setTimeout(() => { f.progress = 30 + Math.random() * 40 }, i * 300)
-      })
+      this.buildErrors = null
+      // Slow progress climb to ~70% over 60s while we wait for parallel LLM calls
+      this.outputFiles.forEach(f => { f.progress = 5 })
+      const tickStart = Date.now()
+      const tickInterval = setInterval(() => {
+        const elapsed = (Date.now() - tickStart) / 1000
+        // Asymptotically approach 70% over ~75s
+        const progress = Math.min(70, 70 * (1 - Math.exp(-elapsed / 25)))
+        this.outputFiles.forEach(f => { if (!f.exists) f.progress = progress })
+      }, 500)
       try {
         const res = await fetch(`/api/prep/${this.slug}/build`, { method: 'POST' })
         const data = await res.json()
-        // Update file statuses
+        clearInterval(tickInterval)
+        // Update file statuses based on what actually got written
         for (const file of this.outputFiles) {
           const info = data.files?.[file.name]
-          if (info?.exists) {
-            file.exists = true
-            file.progress = 100
-          }
+          file.exists = !!info?.exists
+          file.progress = info?.exists ? 100 : 0
         }
-        this.buildComplete = true
-        // Load preview of upload_document
+        this.buildComplete = data.status === 'ok' && Object.values(data.files || {}).every(f => f.exists)
+        if (data.errors && Object.keys(data.errors).length) {
+          this.buildErrors = data.errors
+        }
         await this.loadUploadDocPreview()
         this.updateBadges()
       } catch (e) {
-        console.error('Build failed:', e)
+        clearInterval(tickInterval)
+        this.buildErrors = { _network: e.message }
       } finally {
         this.buildRunning = false
       }

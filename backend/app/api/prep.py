@@ -353,18 +353,340 @@ def save_cast(slug: str):
 
 # ─── PHASE 3: BUILD ─────────────────────────────────────────────────────────
 
+# Each generator builds one output file. The shape of these prompts encodes
+# the same anti-patterns as the cast extractor — "the siblings" must become
+# "Benjamín, Karla, and Isabela", Walmart must become "a major retail buyer", etc.
+
+UPLOAD_DOC_SYSTEM_PROMPT = """You are synthesizing a curated upload document for a MiroFish multi-agent simulation. The document you produce will be uploaded as the Reality Seed in MiroFish — Zep Cloud will extract entities from it, and those entities become simulation agents.
+
+CRITICAL RULES (every rule comes from a $450 simulation failure):
+
+1. NO ORGANIZATION NAMES that could become posting agents.
+   - "Walmart" → "a major retail buyer"
+   - "DEA" → "a federal agency"
+   - "Forbes" → "a business magazine"
+   - "Harvard" → "a top US business school"
+   - "Grupo Serrano" — keep this since the company itself is a story element, not a posting agent
+
+2. NO GROUP REFERENCES — replace with individual full names from the cast.
+   - "the siblings" / "Serrano siblings" → "Benjamín, Karla, and Isabela"
+   - "the family" → list the relevant individuals
+   - "journalists" → name the specific journalist if relevant
+   - "cartels" → "the criminal operation"
+
+3. NO ABSTRACT CONCEPTS that could become entities.
+   - "criminal empire" → "the operation"
+   - "narco operation" → "the operation"
+
+4. MARK DEAD CHARACTERS explicitly. Use "[DECEASED]" inline so Zep classifies them as historical references, not active entities.
+
+5. CHARACTER INDEX HEADER. Open the document with a "CHARACTER INDEX" section that lists every mandatory agent by full name + 1-line role. This anchors Zep's entity extraction.
+
+6. UNDER 50,000 CHARACTERS. MiroFish's ontology generation truncates at 50K. Aim for 30,000-45,000 chars.
+
+7. WRITE IN ENGLISH. Zep extracts cleaner entities from English than from Spanish.
+
+8. PRESERVE NARRATIVE TEXTURE. This isn't a wiki article — keep the dramatic voice from the source materials. The world should feel alive, but every named entity must be a person from the cast (or marked deceased)."""
+
+
+REALITY_SEED_SYSTEM_PROMPT = """You are writing the Reality Seed for a MiroFish multi-agent simulation. This is a 2,000-3,000 character narrative prompt that gets pasted into MiroFish's "Simulation Requirement" field. It tells the simulation engine what world to simulate, who the characters are, and what questions to explore.
+
+STRUCTURE (write in this order):
+
+1. ONE-PARAGRAPH WORLD STATE at simulation start. Name every mandatory agent individually — never as a group. Establish what just happened (the inciting event), who knows what, and what's about to collide.
+
+2. THREE COLLIDING FORCES paragraph. Identify the 2-3 power centers in tension. Name the agents inside each. Make the asymmetries clear.
+
+3. OPEN QUESTIONS the simulation should answer (3-5 questions). These should be genuinely undetermined — not predictions, but live questions about what these specific named characters will do.
+
+4. REPORT STRUCTURE specification: 4 thematic sections at the end. Pick titles that capture the dramatic engine of THIS specific world.
+
+REQUIREMENTS:
+- Write in English (cleaner Zep extraction).
+- Every name is the FULL name from the cast (no first-name-only).
+- No organization names except the company at the heart of the story (e.g., Grupo Serrano).
+- 2,000-3,000 characters total.
+- No "the siblings" / "the family" / generic plurals. Use names.
+- Dead characters get "[DECEASED]" inline."""
+
+
+EVENT_SEEDS_SYSTEM_PROMPT = """You are designing 8 narrative inflection points for a MiroFish multi-agent simulation. Each event is a scheduled trigger that fires at a specific simulation hour to generate dramatic pressure.
+
+OUTPUT FORMAT — strict JSON, no commentary:
+
+{
+  "events": [
+    {
+      "trigger_hour": 12,
+      "agent_name": "Full Proper Name from the cast",
+      "event_type": "post|comment|reveal|action",
+      "description": "1-2 sentence description of what this character does at this hour",
+      "stakes": "Why this matters dramatically"
+    }
+  ]
+}
+
+GUIDELINES:
+- Exactly 8 events spread across the 168-hour arc (~hour 6, 24, 48, 72, 96, 120, 144, 160).
+- Each event must reference a SPECIFIC mandatory agent by full name.
+- Events should escalate — early ones plant seeds, later ones detonate.
+- Mix event types: 2-3 reveals, 2-3 actions, 2-3 posts/comments.
+- Stakes should connect to the open questions in the reality seed.
+- No group references — every event has one named character at its center."""
+
+
+def _read_combined_sources(slug: str, max_chars: int = 80_000) -> str:
+    """Read all source docs for a project, concatenated, capped at max_chars."""
+    sources_dir = _project_dir(slug) / "sources"
+    if not sources_dir.exists():
+        return ""
+    parts = []
+    total = 0
+    for f in sorted(sources_dir.glob("*.md")):
+        text = f.read_text(encoding="utf-8")
+        if total + len(text) > max_chars:
+            remaining = max_chars - total
+            if remaining > 1000:
+                parts.append(text[:remaining])
+            break
+        parts.append(text)
+        total += len(text)
+    return "\n\n========================\n\n".join(parts)
+
+
+def _generate_upload_doc(slug: str, sources: str, cast_data: dict) -> tuple[bool, str]:
+    """Generate upload_document.md via LLM. Returns (success, content_or_error)."""
+    cast_summary = "\n".join(
+        f"- {a['name']} — {a.get('role', '')}"
+        for a in cast_data.get("mandatory_agents", [])
+    )
+    excluded_summary = "\n".join(
+        f"- {e['name']} [DECEASED — {e.get('reason', '')}]"
+        for e in cast_data.get("excluded_entities", [])
+    )
+    user_msg = (
+        f"MANDATORY CAST (these and only these become simulation agents):\n{cast_summary}\n\n"
+        f"EXCLUDED (must appear ONLY as historical references, marked [DECEASED]):\n{excluded_summary}\n\n"
+        f"SOURCE MATERIAL TO SYNTHESIZE FROM:\n\n{sources}\n\n"
+        f"Now produce the curated upload document. Output ONLY the markdown — no commentary, no code fences. "
+        f"Start with a CHARACTER INDEX section listing every mandatory agent. Stay under 50,000 characters."
+    )
+
+    try:
+        from ..utils.llm_client import LLMClient
+        client = LLMClient()
+        result = client.chat(
+            messages=[
+                {"role": "system", "content": UPLOAD_DOC_SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.3,
+            max_tokens=16000,
+        )
+        # Strip code fences if the LLM wrapped in ```markdown blocks
+        result = re.sub(r'^```(?:markdown|md)?\s*\n', '', result.strip(), flags=re.IGNORECASE)
+        result = re.sub(r'\n```\s*$', '', result)
+        return True, result.strip()
+    except Exception as e:
+        return False, str(e)
+
+
+def _generate_reality_seed(slug: str, sources: str, cast_data: dict) -> tuple[bool, str]:
+    """Generate reality_seed.md via LLM."""
+    cast_summary = "\n".join(
+        f"- {a['name']} — {a.get('role', '')} (stance: {a.get('stance', '')})"
+        for a in cast_data.get("mandatory_agents", [])
+    )
+    user_msg = (
+        f"MANDATORY CAST:\n{cast_summary}\n\n"
+        f"SOURCE MATERIAL:\n\n{sources[:60_000]}\n\n"
+        f"Write the reality seed. Output ONLY the markdown narrative — no headers like 'Reality Seed:', "
+        f"no commentary. 2,000-3,000 characters. Name every agent individually."
+    )
+
+    try:
+        from ..utils.llm_client import LLMClient
+        client = LLMClient()
+        result = client.chat(
+            messages=[
+                {"role": "system", "content": REALITY_SEED_SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.4,
+            max_tokens=2000,
+        )
+        result = re.sub(r'^```(?:markdown|md)?\s*\n', '', result.strip(), flags=re.IGNORECASE)
+        result = re.sub(r'\n```\s*$', '', result)
+        return True, result.strip()
+    except Exception as e:
+        return False, str(e)
+
+
+def _generate_event_seeds(slug: str, sources: str, cast_data: dict) -> tuple[bool, dict]:
+    """Generate event_seeds.json via LLM."""
+    cast_summary = "\n".join(
+        f"- {a['name']} ({a.get('stance', '')}): {a.get('role', '')}"
+        for a in cast_data.get("mandatory_agents", [])
+    )
+    user_msg = (
+        f"MANDATORY CAST:\n{cast_summary}\n\n"
+        f"SOURCE MATERIAL (for narrative beats):\n\n{sources[:60_000]}\n\n"
+        f"Design 8 inflection points across 168 hours. Use only these named agents."
+    )
+
+    try:
+        from ..utils.llm_client import LLMClient
+        client = LLMClient()
+        result = client.chat_json(
+            messages=[
+                {"role": "system", "content": EVENT_SEEDS_SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.4,
+            max_tokens=3000,
+        )
+        return True, result
+    except Exception as e:
+        return False, {"error": str(e)}
+
+
+def _build_preflight_report(slug: str, validation: dict, files: dict) -> str:
+    """Mechanical preflight report — no LLM call. Just data assembly."""
+    paths = _output_paths(slug)
+    upload_path = paths["upload_document.md"]
+    seed_path = paths["reality_seed.md"]
+    config_path = paths["simulation_config.json"]
+
+    upload_chars = upload_path.stat().st_size if upload_path.exists() else 0
+    seed_chars = seed_path.stat().st_size if seed_path.exists() else 0
+
+    # Pollution check on upload doc
+    pollution = []
+    if upload_path.exists():
+        text = upload_path.read_text(encoding="utf-8")
+        for term in ["Walmart", " DEA ", "the siblings", "the family", "criminal empire", "narco operation"]:
+            count = text.count(term)
+            if count > 0:
+                pollution.append(f"  ⚠️  Found `{term.strip()}` × {count} — review")
+        chinese = re.findall(r'[\u4e00-\u9fff]', text)
+        if chinese:
+            pollution.append(f"  ❌ Chinese chars detected × {len(chinese)} — must be removed")
+
+    # Cost estimate (rough: agents × rounds × $/call × tokens)
+    agent_count = validation.get("agent_count", 0)
+    duration_hours = 168  # would read meta if needed
+    estimated_calls = agent_count * duration_hours * 0.4  # ~0.4 calls/agent/hour avg
+    estimated_cost = estimated_calls * 0.003 + 10  # $0.003/call avg + $10 report
+    s1_cost = 450
+    savings_pct = (1 - estimated_cost / s1_cost) * 100
+
+    cast_status = "✅ PASS" if validation.get("status") == "PASS" else f"⚠️ {validation.get('status')}"
+
+    report = f"""# Preflight Report — {slug}
+
+**Generated:** {os.environ.get('TZ', 'auto')}
+**Phase:** 4 PREFLIGHT
+**Overall Status:** {"✅ READY" if validation.get("failures", 0) == 0 and not pollution else "⚠️ REVIEW"}
+
+---
+
+## Cast Validation
+
+- **Status:** {cast_status}
+- **Agents:** {agent_count}
+- **Failures:** {validation.get('failures', 0)}
+- **Warnings:** {validation.get('warnings', 0)}
+
+## Document Sizes
+
+| File | Size | Limit | Status |
+|------|------|-------|--------|
+| upload_document.md | {upload_chars:,} chars | 50,000 | {"✅" if upload_chars <= 50000 else "❌ over limit"} |
+| reality_seed.md | {seed_chars:,} chars | 5,000 | {"✅" if seed_chars <= 5000 else "❌ over limit"} |
+
+## Pollution Check (upload_document.md)
+
+{chr(10).join(pollution) if pollution else "  ✅ Clean — no Walmart, DEA, group references, or Chinese chars detected"}
+
+## Output Files
+
+{chr(10).join(f"- {n} {'✅' if f['exists'] else '❌ missing'}" for n, f in files.items())}
+
+## Cost Estimate
+
+| Item | Estimate |
+|------|----------|
+| Agent posts (≈{int(estimated_calls):,} calls × $0.003) | ${estimated_calls * 0.003:.2f} |
+| Report generation | ~$10.00 |
+| **Total estimated** | **${estimated_cost:.2f}** |
+| vs. Oro Verde S1 | $450 ({savings_pct:.0f}% reduction) |
+
+## Ready to Upload?
+
+If all checks above are ✅, the package is ready:
+1. Upload `upload_document.md` to MiroFish as the Reality Seed
+2. Paste `reality_seed.md` into the Simulation Requirement field
+3. ⚠️ Verify entity types come back in **English PascalCase** (not Chinese)
+4. ⚠️ Verify no Organization-typed entities become posting agents
+5. Run a 10-round test before committing to full 168 hours
+"""
+    return report
+
+
 @prep_bp.route("/<slug>/build", methods=["POST"])
 def build_package(slug: str):
     """
-    Run generate_config.py against the cast file, report output file statuses.
-    Language and duration are read from project meta.json.
+    Generate all 5 output files. Runs 3 LLM-driven generators in parallel
+    (upload_document, reality_seed, event_seeds), runs generate_config.py
+    locally, and assembles preflight_report.md from the others.
+
+    Total wall time: typically 60-90 seconds (parallel LLM calls + small overhead).
     """
+    from concurrent.futures import ThreadPoolExecutor
+
     cast_file = _cast_path(slug)
     if not cast_file.exists():
         return jsonify({"error": "character_cast.json not found — complete CAST phase first"}), 400
 
-    # Read project meta for language/duration
-    meta_path = _project_dir(slug) / "meta.json"
+    cast_data = json.loads(cast_file.read_text(encoding="utf-8"))
+    if not cast_data.get("mandatory_agents"):
+        return jsonify({"error": "character_cast.json has no mandatory_agents"}), 400
+
+    sources = _read_combined_sources(slug)
+    if not sources:
+        return jsonify({"error": "No source documents found — re-run INGEST"}), 400
+
+    paths = _output_paths(slug)
+    project_dir = _project_dir(slug)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Run the 3 LLM generators in parallel
+    errors = {}
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_upload = ex.submit(_generate_upload_doc, slug, sources, cast_data)
+        f_seed = ex.submit(_generate_reality_seed, slug, sources, cast_data)
+        f_events = ex.submit(_generate_event_seeds, slug, sources, cast_data)
+
+        ok, content = f_upload.result()
+        if ok:
+            paths["upload_document.md"].write_text(content, encoding="utf-8")
+        else:
+            errors["upload_document"] = content
+
+        ok, content = f_seed.result()
+        if ok:
+            paths["reality_seed.md"].write_text(content, encoding="utf-8")
+        else:
+            errors["reality_seed"] = content
+
+        ok, content = f_events.result()
+        if ok:
+            paths["event_seeds.json"].write_text(json.dumps(content, indent=2, ensure_ascii=False), encoding="utf-8")
+        else:
+            errors["event_seeds"] = content.get("error", "unknown")
+
+    # 2. Run the local config generator (fast, no LLM)
+    meta_path = project_dir / "meta.json"
     language = "en"
     duration = "168"
     if meta_path.exists():
@@ -375,33 +697,56 @@ def build_package(slug: str):
         except (json.JSONDecodeError, KeyError):
             pass
 
-    # Run the config generator script
     script = SCRIPTS_DIR / "generate_config.py"
+    config_result = {"returncode": 0, "stdout": "", "stderr": ""}
     if script.exists():
         try:
-            result = subprocess.run(
+            r = subprocess.run(
                 [sys.executable, str(script), str(cast_file), "--duration", duration, "--language", language],
                 capture_output=True, text=True, timeout=30, cwd=str(REPO_ROOT)
             )
+            if r.returncode == 0 and r.stdout:
+                paths["simulation_config.json"].write_text(r.stdout, encoding="utf-8")
+            config_result = {"returncode": r.returncode, "stdout": r.stdout[-500:], "stderr": r.stderr[-500:]}
         except subprocess.TimeoutExpired:
-            result = type("R", (), {"returncode": 1, "stdout": "", "stderr": "timeout"})()
-    else:
-        result = type("R", (), {"returncode": 0, "stdout": "generate_config.py not found — skipped", "stderr": ""})()
+            errors["simulation_config"] = "config generator timed out"
 
-    # Collect file statuses
-    paths = _output_paths(slug)
+    # 3. Run validator on the cast for preflight
+    validation = {"status": "UNKNOWN", "failures": 0, "warnings": 0, "agent_count": len(cast_data.get("mandatory_agents", []))}
+    validator = SCRIPTS_DIR / "validate_cast.py"
+    if validator.exists():
+        try:
+            r = subprocess.run(
+                [sys.executable, str(validator), str(cast_file)],
+                capture_output=True, text=True, timeout=15,
+            )
+            try:
+                validation = json.loads(r.stdout)
+            except json.JSONDecodeError:
+                pass
+        except subprocess.TimeoutExpired:
+            pass
+
+    # 4. Collect file statuses (now that things are written)
     files = {}
     for name, path in paths.items():
-        if path.exists():
-            files[name] = {"exists": True, "size_bytes": path.stat().st_size}
-        else:
-            files[name] = {"exists": False}
+        files[name] = {"exists": path.exists(), "size_bytes": path.stat().st_size if path.exists() else 0}
+
+    # 5. Assemble preflight report (mechanical)
+    try:
+        preflight_md = _build_preflight_report(slug, validation, files)
+        paths["preflight_report.md"].write_text(preflight_md, encoding="utf-8")
+        files["preflight_report.md"] = {"exists": True, "size_bytes": paths["preflight_report.md"].stat().st_size}
+    except Exception as e:
+        errors["preflight_report"] = str(e)
+
+    overall = "ok" if not errors else ("partial" if files["upload_document.md"]["exists"] else "failed")
 
     return jsonify({
-        "status": "ok" if result.returncode == 0 else "warning",
-        "generator_stdout": (result.stdout or "")[-2000:],
-        "generator_stderr": (result.stderr or "")[-500:],
+        "status": overall,
         "files": files,
+        "errors": errors,
+        "validation": validation,
     })
 
 
