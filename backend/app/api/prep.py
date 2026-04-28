@@ -499,7 +499,9 @@ def _scrub_pollution(text: str, cast_data: dict) -> dict:
         # "the Serranos" alone (without compound noun) → names
         text = sub_count(rf"\bthe {sn_re}s\b{safe_lookahead}", joined, text)
 
-    # 3. Generic group references (use the LARGEST family detected)
+    # 3. Generic group references (use the LARGEST family detected).
+    # IMPORTANT: replace with FIRST NAMES, not "the Surnames" — the latter
+    # is itself a junk-entity creator (S1 created `serrano_358`, `serrano_name_172`).
     main_family = max(families.items(), key=lambda kv: len(kv[1]), default=(None, []))
     if main_family[0] and len(main_family[1]) >= 2:
         first_names = main_family[1]
@@ -510,10 +512,17 @@ def _scrub_pollution(text: str, cast_data: dict) -> dict:
 
         text = sub_count(r"\bthe three siblings\b", joined, text)
         text = sub_count(r"\bthe siblings\b", joined, text)
-        # "the family X" where X is a compound noun → leave alone
-        text = sub_count(rf"\bthe family\b{safe_lookahead}", f"the {main_family[0]}s", text)
-        # Possessive form: "the family's" → "the Serranos'"
+        # "the family X" where X is a compound noun → leave alone.
+        # Otherwise use first names, NOT "the Serranos" (which is also pollution).
+        text = sub_count(rf"\bthe family\b{safe_lookahead}", joined, text)
+        # Possessive form: "the family's" → "[first names]'" — but possessive is
+        # awkward for a list of names, so use the surname-plural possessive only
+        # when the phrase is genuinely possessive (rare in practice).
         text = sub_count(r"\bthe family's\b", f"the {main_family[0]}s'", text)
+        # And immediately scrub the introduced "the Serranos'" possessive form
+        # by replacing it with first names (since plural surname creates entity).
+        # We accept the awkward "Benjamín, Karla, and Isabela's" possessive.
+        text = sub_count(rf"\bthe {re.escape(main_family[0])}s'\b", f"{joined}'", text)
 
     # 4. Hard replacements (always-bad terms regardless of project).
     # Match the leading article so we don't end up with "the the operation".
@@ -525,6 +534,13 @@ def _scrub_pollution(text: str, cast_data: dict) -> dict:
         (r"\bthe\s+criminal\s+operation\b", "the operation"),
         (r"\bcriminal\s+operation\b", "the operation"),
         (r"\bthe\s+criminal\s+organization\b", "the operation"),
+        # Institution names that became Zep entities in S1 — generic descriptors
+        (r"\bHarvard\s+(?:MBA|Business\s+School)\b", "a top business school MBA"),
+        (r"\bHarvard\b", "a top US business school"),
+        (r"\bWalmart\b", "a major retail buyer"),
+        (r"\b(?:the\s+)?DEA\b", "a federal agency"),
+        (r"\bForbes\b", "a major business publication"),
+        (r"\b(?:the\s+)?(?:FBI|CIA|NSA)\b", "a federal agency"),
     ]
     for pat, repl in HARD_PATTERNS:
         text = sub_count(pat, repl, text)
