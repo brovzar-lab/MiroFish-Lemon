@@ -88,15 +88,14 @@ class LLMClient:
         max_tokens: int = 4096
     ) -> Dict[str, Any]:
         """
-        发送聊天请求并返回JSON
-        
-        Args:
-            messages: 消息列表
-            temperature: 温度参数
-            max_tokens: 最大token数
-            
-        Returns:
-            解析后的JSON对象
+        Send chat request and parse JSON response.
+
+        Uses three fallback strategies for robustness — some LLMs prefix/suffix
+        their JSON with explanation text or wrap it in code fences:
+
+          1. Direct json.loads after stripping ```json fences
+          2. Extract content between ```json...``` fences anywhere in response
+          3. Find outermost {...} or [...] block via brace matching
         """
         response = self.chat(
             messages=messages,
@@ -104,14 +103,60 @@ class LLMClient:
             max_tokens=max_tokens,
             response_format={"type": "json_object"}
         )
-        # 清理markdown代码块标记
-        cleaned_response = response.strip()
-        cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
-        cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
-        cleaned_response = cleaned_response.strip()
 
+        # Strategy 1: strip leading/trailing fences and parse
+        cleaned = response.strip()
+        cleaned = re.sub(r'^```(?:json)?\s*\n?', '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+        cleaned = cleaned.strip()
         try:
-            return json.loads(cleaned_response)
+            return json.loads(cleaned)
         except json.JSONDecodeError:
-            raise ValueError(f"LLM返回的JSON格式无效: {cleaned_response}")
+            pass
+
+        # Strategy 2: find the first ```json...``` block anywhere
+        fence_match = re.search(r'```(?:json)?\s*\n([\s\S]*?)\n```', response, re.IGNORECASE)
+        if fence_match:
+            try:
+                return json.loads(fence_match.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+
+        # Strategy 3: find the outermost balanced {...} or [...] block
+        for open_char, close_char in [('{', '}'), ('[', ']')]:
+            start = response.find(open_char)
+            if start == -1:
+                continue
+            depth = 0
+            end = -1
+            in_str = False
+            esc = False
+            for i in range(start, len(response)):
+                c = response[i]
+                if esc:
+                    esc = False
+                    continue
+                if c == '\\':
+                    esc = True
+                    continue
+                if c == '"':
+                    in_str = not in_str
+                    continue
+                if in_str:
+                    continue
+                if c == open_char:
+                    depth += 1
+                elif c == close_char:
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            if end > start:
+                candidate = response[start:end + 1]
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
+        raise ValueError(f"LLM returned invalid JSON (no parseable structure found): {response[:500]}")
 

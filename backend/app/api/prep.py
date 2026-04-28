@@ -135,7 +135,198 @@ def parse_doc(slug: str):
     return jsonify({"word_count": words, "char_count": chars})
 
 
+@prep_bp.route("/<slug>/sources", methods=["POST"])
+def save_sources(slug: str):
+    """
+    Persist uploaded source documents to sim-prep/<slug>/sources/.
+
+    Body: {sources: [{id, label, filename, content}, ...]}
+    Each source is saved to sources/<id>.md so the AI extraction
+    step can read them back. Replaces any existing sources for this slug.
+    """
+    data = request.get_json(silent=True) or {}
+    sources = data.get("sources", [])
+    if not sources:
+        return jsonify({"error": "No sources provided"}), 400
+
+    sources_dir = _project_dir(slug) / "sources"
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    # Clear stale sources first
+    for existing in sources_dir.glob("*.md"):
+        existing.unlink()
+
+    saved = []
+    total_chars = 0
+    for src in sources:
+        sid = src.get("id")
+        content = src.get("content", "")
+        if not sid or not content:
+            continue
+        # Sanitize id for filename
+        safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", sid)[:64]
+        path = sources_dir / f"{safe_id}.md"
+        # Header lets the AI know which document is which
+        label = src.get("label", sid)
+        filename = src.get("filename", "")
+        header = f"# Source: {label}\n# File: {filename}\n# ID: {sid}\n\n---\n\n"
+        path.write_text(header + content, encoding="utf-8")
+        saved.append({"id": sid, "chars": len(content), "label": label})
+        total_chars += len(content)
+
+    return jsonify({
+        "status": "ok",
+        "saved": saved,
+        "total_chars": total_chars,
+        "sources_dir": str(sources_dir.relative_to(REPO_ROOT)),
+    })
+
+
 # ─── PHASE 2: CAST ──────────────────────────────────────────────────────────
+
+# Extraction prompt — encodes all 29 failure modes from the Oro Verde S1 post-mortem
+# as anti-patterns the AI must avoid. Output schema matches what validate_cast.py expects.
+CAST_EXTRACTION_SYSTEM_PROMPT = """You are a casting director for a MiroFish multi-agent narrative simulation. Your job: extract a clean character cast from source materials (show bibles, screenplays, treatments, character breakdowns).
+
+CRITICAL CONTEXT — what NOT to do (every rule below comes from a real failure that burned $450 in a prior run):
+
+1. NEVER create an agent for a generic noun. Bad: "senators", "cartels", "the family", "the siblings", "grandmother", "journalists", "activists", "CEOs", "officials". Good: extract the actual NAMED individuals these refer to.
+
+2. NEVER create an agent for an organization. Bad: "Walmart", "DEA", "FBI", "Forbes", "Grupo Serrano", "Harvard", "criminal empire", "narco operation". These are entities mentioned in the world, not posting characters.
+
+3. NEVER create a duplicate agent for the same character. If the source says "Javier" in one place and "Javier Cordero" elsewhere, ONE agent named "Javier Cordero" — not two.
+
+4. NEVER create an agent with first-name-only when a surname exists in the source. "Karla" → "Karla Serrano". "Benjamín" → "Benjamín Serrano". Exception: characters with intentional single-name identity like "Reynaldo" the thief.
+
+5. NEVER create an agent for a dead character. If someone died before the simulation start (e.g., killed in the pilot, died of illness), they go in `excluded_entities`, NOT `mandatory_agents`. Knowledge graph references only.
+
+6. NEVER hallucinate names. If the source says "Ernesto Vega", the agent is "Ernesto Vega" — not "Nesto Vega" or any partial/altered form.
+
+7. NEVER use generic descriptors as names. Bad: "fourteen-year-old girl", "the unnamed thief", "young woman", "the lawyer". If the character has no name in the source, skip them or use a single distinctive identifier ("Reynaldo" if named, otherwise omit).
+
+OUTPUT FORMAT — strict JSON, no commentary:
+
+{
+  "mandatory_agents": [
+    {
+      "name": "Full Proper Name",
+      "role": "Their function in the story (one short sentence)",
+      "stance": "protagonist|antagonist|opposing|neutral|supportive",
+      "enneagram": "3w2 (or null if not specified)",
+      "influence_weight": 1.0-3.0,
+      "_psychology_notes": "1-2 sentences on their wound, want, and flaw"
+    }
+  ],
+  "excluded_entities": [
+    {"name": "Full Name", "reason": "deceased_before_simulation|deceased_in_pilot|reference_only"}
+  ],
+  "max_additional_agents": 3
+}
+
+GUIDELINES:
+- 8-15 mandatory agents is ideal. Quality over quantity.
+- Stance values: protagonist (drives plot from inside), antagonist (opposes protagonist directly), opposing (external pressure), neutral (observer/context), supportive (allied with protagonist).
+- influence_weight: 3.0 for power-broker characters, 2.0 for principal cast, 1.4 for supporting, 1.0 for minor.
+- excluded_entities: dead characters, organizations central to plot but not posting agents, archive-only references.
+- max_additional_agents: how many bonus background agents the simulation engine may generate (default 3).
+
+Be ruthless about the failure rules above. The cost of one junk agent is $20-40 per simulation."""
+
+
+@prep_bp.route("/<slug>/cast/extract", methods=["POST"])
+def extract_cast(slug: str):
+    """
+    Run AI cast extraction from stored source documents.
+
+    Reads sim-prep/<slug>/sources/*.md, combines them into a single context,
+    sends to the LLM with a strict extraction prompt, validates the result
+    against scripts/mirofish-prep/validate_cast.py, and writes
+    character_cast.json on success.
+    """
+    sources_dir = _project_dir(slug) / "sources"
+    if not sources_dir.exists() or not list(sources_dir.glob("*.md")):
+        return jsonify({
+            "error": "No source documents found",
+            "hint": "Upload source docs in INGEST and click Save before extracting cast.",
+        }), 400
+
+    # Combine all source files. Cap at ~80K chars to stay safely within Sonnet's
+    # context budget while leaving room for the system prompt and output tokens.
+    MAX_CONTEXT_CHARS = 80_000
+    parts = []
+    total = 0
+    for f in sorted(sources_dir.glob("*.md")):
+        text = f.read_text(encoding="utf-8")
+        if total + len(text) > MAX_CONTEXT_CHARS:
+            # Truncate the last doc to fit, mark it
+            remaining = MAX_CONTEXT_CHARS - total
+            if remaining > 1000:
+                parts.append(text[:remaining] + f"\n\n[...{len(text) - remaining:,} chars truncated to fit context...]")
+                total = MAX_CONTEXT_CHARS
+            break
+        parts.append(text)
+        total += len(text)
+
+    if not parts:
+        return jsonify({"error": "No source content to extract from"}), 400
+
+    combined = "\n\n========================\n\n".join(parts)
+
+    # Call the LLM
+    try:
+        from ..utils.llm_client import LLMClient, CreditExhaustedException
+        client = LLMClient()
+        cast_data = client.chat_json(
+            messages=[
+                {"role": "system", "content": CAST_EXTRACTION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Extract the character cast from these source documents:\n\n{combined}"},
+            ],
+            temperature=0.2,
+            max_tokens=8192,
+        )
+    except CreditExhaustedException as e:
+        return jsonify({"error": "credits_exhausted", "message": str(e)}), 402
+    except ValueError as e:
+        return jsonify({"error": "llm_invalid_json", "message": str(e)}), 502
+    except Exception as e:
+        return jsonify({"error": "llm_call_failed", "message": str(e)}), 502
+
+    # Sanity check the shape
+    if not isinstance(cast_data, dict) or "mandatory_agents" not in cast_data:
+        return jsonify({
+            "error": "extraction_invalid_shape",
+            "message": "LLM response did not match expected schema",
+            "got": cast_data if isinstance(cast_data, dict) else {"_type": str(type(cast_data))},
+        }), 502
+
+    # Run our validator (subprocess so we don't pollute Flask's import space)
+    cast_path = _cast_path(slug)
+    cast_path.parent.mkdir(parents=True, exist_ok=True)
+    cast_path.write_text(json.dumps(cast_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    validation = {"status": "UNKNOWN", "failures": 0, "warnings": 0, "checks": []}
+    validator = SCRIPTS_DIR / "validate_cast.py"
+    if validator.exists():
+        try:
+            r = subprocess.run(
+                [sys.executable, str(validator), str(cast_path)],
+                capture_output=True, text=True, timeout=20,
+            )
+            try:
+                validation = json.loads(r.stdout)
+            except json.JSONDecodeError:
+                validation = {"status": "ERROR", "raw_stdout": r.stdout[:1000], "stderr": r.stderr[:500]}
+        except subprocess.TimeoutExpired:
+            validation = {"status": "TIMEOUT"}
+
+    return jsonify({
+        "status": "ok",
+        "agent_count": len(cast_data.get("mandatory_agents", [])),
+        "excluded_count": len(cast_data.get("excluded_entities", [])),
+        "context_chars": total,
+        "cast": cast_data,
+        "validation": validation,
+    })
+
 
 @prep_bp.route("/<slug>/cast", methods=["GET"])
 def get_cast(slug: str):

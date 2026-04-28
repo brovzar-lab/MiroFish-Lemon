@@ -122,7 +122,7 @@
             <button
               class="action-btn primary"
               :disabled="!canAdvance"
-              @click="activePhase = 'cast'"
+              @click="advanceToCast"
             >
               {{ canAdvance ? `Advance to CAST with ${loadedDocCount} source${loadedDocCount === 1 ? '' : 's'} →` : 'Advance to CAST →' }}
             </button>
@@ -138,9 +138,29 @@
               <div class="toolbar-chip mono">{{ activeAgentCount }} agents active</div>
             </div>
 
-            <div v-if="castLoading" class="loading-state mono">Loading cast from character_cast.json…</div>
-            <div v-else-if="castError" class="error-state mono">{{ castError }}</div>
-            <div v-else class="masonry-grid">
+            <div v-if="castLoading" class="loading-state mono">
+              <div v-if="castExtracting">
+                <div style="font-size:14px;margin-bottom:6px;">🧠 Running AI extraction on {{ loadedDocCount }} source{{ loadedDocCount === 1 ? '' : 's' }}…</div>
+                <div style="opacity:0.7;font-size:11px;">Reading source docs, identifying named characters, filtering organizations and generic nouns. Usually 30-90 seconds.</div>
+              </div>
+              <div v-else>Loading cast from character_cast.json…</div>
+            </div>
+            <div v-else-if="castError" class="error-state mono">
+              <div style="margin-bottom:10px;">{{ castError }}</div>
+              <button class="action-btn secondary" @click="extractCast">Retry extraction</button>
+            </div>
+            <div v-else-if="cast.length === 0 && loadedDocCount > 0" class="empty-state mono" style="padding:18px;background:#f7f3e9;border-radius:6px;text-align:center;">
+              <div style="margin-bottom:10px;">No cast extracted yet.</div>
+              <button class="action-btn primary" @click="extractCast">Extract cast from {{ loadedDocCount }} source{{ loadedDocCount === 1 ? '' : 's' }}</button>
+            </div>
+            <div v-else>
+              <div v-if="castValidation && (castValidation.failures > 0 || castValidation.warnings > 0)" class="validation-banner mono" style="background:#fff7ec;border:1px solid #e8c87a;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:12px;">
+                <strong>Validation:</strong> {{ castValidation.agent_count }} agents extracted ·
+                <span v-if="castValidation.failures">{{ castValidation.failures }} failures</span>
+                <span v-else>0 failures ✓</span>
+                <span v-if="castValidation.warnings"> · {{ castValidation.warnings }} warnings</span>
+              </div>
+              <div class="masonry-grid">
               <div
                 v-for="agent in cast"
                 :key="agent.name"
@@ -180,6 +200,7 @@
                   </div>
                   <span class="mono" style="font-size:11px;min-width:28px;text-align:right;">{{ agent.influence_weight }}x</span>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -433,6 +454,8 @@ export default {
       excluded: [],
       castLoading: false,
       castError: null,
+      castExtracting: false,
+      castValidation: null,
 
       // Build
       buildRunning: false,
@@ -560,22 +583,105 @@ export default {
     },
 
     // ── CAST ───────────────────────────────────────────────────
-    async loadCast() {
-      this.castLoading = true
+    async loadCast({ silent = false } = {}) {
+      if (!silent) this.castLoading = true
       this.castError = null
       try {
         const res = await fetch(`/api/prep/${this.slug}/cast`)
+        if (res.status === 404) {
+          // No cast yet — that's fine, the user will trigger extraction
+          this.cast = []
+          this.excluded = []
+          return false
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
         const agents = data.mandatory_agents || []
         this.cast = agents.map(a => ({ ...a, _agentOn: true }))
         this.excluded = data.excluded_entities || []
         this.updateBadges()
+        return true
       } catch (e) {
         this.castError = `Could not load cast: ${e.message}. Make sure the backend is running.`
+        return false
+      } finally {
+        if (!silent) this.castLoading = false
+      }
+    },
+
+    async saveSourcesToBackend() {
+      const payload = {
+        sources: this.docs.filter(d => d.loaded).map(d => ({
+          id: d.id,
+          label: d.label,
+          filename: d.filename,
+          content: d.content,
+        })),
+      }
+      const res = await fetch(`/api/prep/${this.slug}/sources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `Save sources failed: HTTP ${res.status}`)
+      }
+      return await res.json()
+    },
+
+    async extractCast() {
+      this.castLoading = true
+      this.castError = null
+      this.castExtracting = true
+      this.castValidation = null
+      try {
+        const res = await fetch(`/api/prep/${this.slug}/cast/extract`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const msg = data.message || data.error || `HTTP ${res.status}`
+          throw new Error(msg)
+        }
+        // Hydrate the local state from the freshly-saved character_cast.json
+        const agents = data.cast?.mandatory_agents || []
+        this.cast = agents.map(a => ({ ...a, _agentOn: true }))
+        this.excluded = data.cast?.excluded_entities || []
+        this.castValidation = data.validation || null
+        this.updateBadges()
+      } catch (e) {
+        this.castError = `Cast extraction failed: ${e.message}`
       } finally {
         this.castLoading = false
+        this.castExtracting = false
       }
+    },
+
+    async advanceToCast() {
+      // Save sources to disk, switch tab, then run extraction.
+      this.activePhase = 'cast'
+      this.castLoading = true
+      this.castExtracting = true
+      this.castError = null
+      try {
+        await this.saveSourcesToBackend()
+      } catch (e) {
+        this.castError = `Could not save sources to backend: ${e.message}`
+        this.castLoading = false
+        this.castExtracting = false
+        return
+      }
+      // If a cast already exists for this project, prefer it (lets you rerun INGEST without re-extracting)
+      const hadCast = await this.loadCast({ silent: true })
+      if (hadCast && this.cast.length) {
+        this.castLoading = false
+        this.castExtracting = false
+        return
+      }
+      // Otherwise run AI extraction
+      await this.extractCast()
     },
 
     async saveCast() {
