@@ -569,10 +569,25 @@ PLAN_SYSTEM_PROMPT = """\
 - ❌ 不是泛泛而谈的舆情综述
 
 【章节数量限制】
-- 最少2个章节，最多5个章节
-- 不需要子章节，每个章节直接撰写完整内容
-- 内容要精炼，聚焦于核心预测发现
+- 最少3个章节，最多7个章节
+- 章节内可使用小节（###）组织长内容
+- 聚焦于核心预测发现
 - 章节结构由你根据预测结果自主设计
+
+【叙事作品报告 — 面向影视故事部门】(Lemon)
+When the simulation is a narrative/story world (characters, factions, a plot),
+the audience is a FILM/TV STORY DEPARTMENT, not a risk analyst. Then:
+- Plan sections around STORY: where the narrative naturally went, which
+  conflicts escalated, which alliances formed or broke, and what that means
+  for the season's arc.
+- ALWAYS include one section that is a CHARACTER-BY-CHARACTER breakdown:
+  each major character's trajectory, want vs. outcome, and their most
+  revealing quote from the simulation.
+- ALWAYS include a final section of STORY IMPLICATIONS: which emergent beats
+  are strongest for episodes, which threads died, and the single most
+  surprising turn the simulation produced.
+- Use story vocabulary naturally (arc, beat, escalation, reversal, stakes),
+  in the report's target language.
 
 请输出JSON格式的报告大纲，格式如下：
 {
@@ -586,7 +601,7 @@ PLAN_SYSTEM_PROMPT = """\
     ]
 }
 
-注意：sections数组最少2个，最多5个元素！"""
+注意：sections数组最少3个，最多7个元素！"""
 
 PLAN_USER_PROMPT_TEMPLATE = """\
 【预测场景设定】
@@ -608,7 +623,7 @@ PLAN_USER_PROMPT_TEMPLATE = """\
 
 根据预测结果，设计最合适的报告章节结构。
 
-【再次提醒】报告章节数量：最少2个，最多5个，内容要精炼聚焦于核心预测发现。"""
+【再次提醒】报告章节数量：最少3个，最多7个，聚焦于核心预测发现。"""
 
 # ── 章节生成 prompt ──
 
@@ -635,6 +650,12 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
 
 ❌ 不要写成对现实世界现状的分析
 ✅ 要聚焦于"未来会怎样"——模拟结果就是预测的未来
+
+【叙事作品章节 — 面向影视故事部门】(Lemon)
+If the simulation is a narrative/story world, write for a FILM/TV STORY
+DEPARTMENT: track character arcs (want vs. outcome), escalations, reversals
+and stakes; quote characters' own posts as evidence (via interview_agents
+and retrieval); prefer concrete story beats over abstract risk language.
 
 ═══════════════════════════════════════════════════════════════
 【最重要的规则 - 必须遵守】
@@ -674,24 +695,24 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
 【⚠️ 格式规范 - 极其重要！】
 ═══════════════════════════════════════════════════════════════
 
-【一个章节 = 最小内容单位】
-- 每个章节是报告的最小分块单位
-- ❌ 禁止在章节内使用任何 Markdown 标题（#、##、###、#### 等）
-- ❌ 禁止在内容开头添加章节主标题
-- ✅ 章节标题由系统自动添加，你只需撰写纯正文内容
-- ✅ 使用**粗体**、段落分隔、引用、列表来组织内容，但不要用标题
+【一个章节的结构】
+- 每个章节是报告的分块单位
+- ❌ 禁止使用 # 或 ## 标题（报告主标题和章节标题由系统自动添加）
+- ❌ 禁止在内容开头重复章节主标题
+- ✅ 可以使用 ### 小节标题组织长内容（长表格、多角色分析时推荐）
+- ✅ 配合**粗体**、段落分隔、引用、列表、Markdown表格来组织内容
 
 【正确示例】（仅示范格式结构；报告语言以本提示末尾的语言指令为准，不要模仿示例的语言）
 ```
 本章节分析了事件的舆论传播态势。通过对模拟数据的深入分析，我们发现...
 
-**首发引爆阶段**
+### 首发引爆阶段
 
 微博作为舆情的第一现场，承担了信息首发的核心功能：
 
 > "微博贡献了68%的首发声量..."
 
-**情绪放大阶段**
+### 情绪放大阶段
 
 抖音平台进一步放大了事件影响力：
 
@@ -701,10 +722,8 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
 
 【错误示例】
 ```
-## 执行摘要          ← 错误！不要添加任何标题
-### 一、首发阶段     ← 错误！不要用###分小节
-#### 1.1 详细分析   ← 错误！不要用####细分
-
+# 报告标题           ← 错误！主标题由系统添加
+## 执行摘要          ← 错误！章节标题由系统添加
 本章节分析了...
 ```
 
@@ -747,11 +766,11 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
 
 1. 内容必须基于工具检索到的模拟数据
 2. 大量引用原文来展示模拟效果
-3. 使用Markdown格式（但禁止使用标题）：
-   - 使用 **粗体文字** 标记重点（代替子标题）
-   - 使用列表（-或1.2.3.）组织要点
+3. 使用Markdown格式：
+   - 使用 ### 小节标题组织长内容（禁止 # 和 ##，由系统管理）
+   - 使用 **粗体文字** 标记重点
+   - 使用列表（-或1.2.3.）和表格组织要点
    - 使用空行分隔不同段落
-   - ❌ 禁止使用 #、##、###、#### 等任何标题语法
 4. 【引用格式规范 - 必须单独成段】
    引用必须独立成段，前后各有一个空行，不能混在段落中：
 
@@ -770,7 +789,7 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
    ```
 5. 保持与其他章节的逻辑连贯性
 6. 【避免重复】仔细阅读下方已完成的章节内容，不要重复描述相同的信息
-7. 【再次强调】不要添加任何标题！用**粗体**代替小节标题"""
+7. 【再次强调】# 和 ## 由系统管理；小节请用 ### 标题或**粗体**"""
 
 SECTION_USER_PROMPT_TEMPLATE = """\
 已完成的章节内容（请仔细阅读，避免重复）：
@@ -787,10 +806,9 @@ SECTION_USER_PROMPT_TEMPLATE = """\
 4. 报告内容必须来自检索结果，不要使用自己的知识
 
 【⚠️ 格式警告 - 必须遵守】
-- ❌ 不要写任何标题（#、##、###、####都不行）
+- ❌ 不要写 # 或 ## 标题（报告主标题和章节标题由系统自动添加）
 - ❌ 不要写"{section_title}"作为开头
-- ✅ 章节标题由系统自动添加
-- ✅ 直接写正文，用**粗体**代替小节标题
+- ✅ 直接写正文；长内容可用 ### 小节标题组织
 
 请开始：
 1. 首先思考（Thought）这个章节需要什么信息
@@ -878,8 +896,8 @@ class ReportAgent:
     3. 反思阶段：检查内容完整性和准确性
     """
     
-    # 最大工具调用次数（每个章节）
-    MAX_TOOL_CALLS_PER_SECTION = 5
+    # 最大工具调用次数（每个章节）— wired to REPORT_AGENT_MAX_TOOL_CALLS
+    MAX_TOOL_CALLS_PER_SECTION = Config.REPORT_AGENT_MAX_TOOL_CALLS
     
     # 最大反思轮数
     MAX_REFLECTION_ROUNDS = 3
@@ -1348,8 +1366,8 @@ class ReportAgent:
             # 调用LLM
             response = self.llm.chat(
                 messages=messages,
-                temperature=0.5,
-                max_tokens=4096
+                temperature=Config.REPORT_AGENT_TEMPERATURE,
+                max_tokens=Config.REPORT_AGENT_MAX_TOKENS
             )
 
             # 检查 LLM 返回是否为 None（API 异常或内容为空）
@@ -1556,8 +1574,8 @@ class ReportAgent:
         
         response = self.llm.chat(
             messages=messages,
-            temperature=0.5,
-            max_tokens=4096
+            temperature=Config.REPORT_AGENT_TEMPERATURE,
+            max_tokens=Config.REPORT_AGENT_MAX_TOKENS
         )
 
         # 检查强制收尾时 LLM 返回是否为 None
@@ -2341,10 +2359,15 @@ class ReportManager:
                         skip_next_empty = True
                         continue
                 
-                # 将所有级别的标题（#, ##, ###, ####等）转换为粗体
-                # 因为章节标题由系统添加，内容中不应有任何标题
-                cleaned_lines.append(f"**{title_text}**")
-                cleaned_lines.append("")  # 添加空行
+                # #、## 由系统管理；### 小节保留；#### 及以下转为粗体
+                if level <= 2:
+                    cleaned_lines.append(f"**{title_text}**")
+                    cleaned_lines.append("")
+                elif level == 3:
+                    cleaned_lines.append(f"### {title_text}")
+                else:
+                    cleaned_lines.append(f"**{title_text}**")
+                    cleaned_lines.append("")
                 continue
             
             # 如果上一行是被跳过的标题，且当前行为空，也跳过
@@ -2555,12 +2578,16 @@ class ReportManager:
                         processed_lines.append(f"**{title}**")
                         processed_lines.append("")
                         prev_was_heading = False
+                elif level == 3:
+                    # ### 小节标题保留 — 故事部门需要可导航的层级
+                    processed_lines.append(line)
+                    prev_was_heading = True
                 else:
-                    # ### 及以下级别的标题转换为粗体文本
+                    # #### 及以下级别的标题转换为粗体文本
                     processed_lines.append(f"**{title}**")
                     processed_lines.append("")
                     prev_was_heading = False
-                
+
                 i += 1
                 continue
             
