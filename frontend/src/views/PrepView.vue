@@ -79,6 +79,16 @@
             </div>
             <p class="section-copy">Drop whatever source documents you have into the matching tiles. <strong>You only need one</strong> — the AI will infer the rest from what you provide. More inputs = richer extraction, but a single show bible or screenplay is enough to advance.</p>
 
+            <!-- Document Wizard entry -->
+            <router-link :to="`/project/${slug}/interview`" class="wizard-banner">
+              <div class="wizard-banner-icon">🎙️</div>
+              <div class="wizard-banner-text">
+                <div class="wizard-banner-title">Don't have these documents? Build them with me.</div>
+                <div class="wizard-banner-sub mono">THE WIZARD INTERVIEWS YOU AND WRITES THE SOURCE DOCUMENTS · UPLOADS ARE NEVER ASKED ABOUT</div>
+              </div>
+              <div class="wizard-banner-cta mono">START THE INTERVIEW →</div>
+            </router-link>
+
             <div class="doc-grid">
               <div
                 v-for="doc in docs"
@@ -449,7 +459,7 @@ export default {
 
       docs: [
         { id: 'bible',     label: 'Show Bible',              hint: 'Show bible, PDF, or fountain export — recommended primary',   accept: '.md,.txt,.pdf,.fountain', wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
-        { id: 'synopsis',  label: 'Pilot Synopsis',          hint: 'Optional — outline, treatment, or synopsis draft', accept: '.md,.txt,.pdf,.docx',     wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
+        { id: 'synopsis',  label: 'Pilot Synopsis',          hint: 'Optional — outline, treatment, or synopsis draft', accept: '.md,.txt,.pdf',     wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
         { id: 'protocol',  label: 'Interrogation Protocol',  hint: 'Optional — character interrogation or psych analysis', accept: '.md,.txt',                wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
         { id: 'seed',      label: 'Seed Prompt',             hint: 'Optional — short simulation requirement prompt', accept: '.md,.txt',             wide: false, loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
         { id: 'handoff',   label: 'Handoff Doc',             hint: 'Optional — producer notes, decisions, phase log',       accept: '.md,.txt,.pdf',           wide: true,  loaded: false, filename: '', wordCount: 0, content: '', dragging: false, optional: true },
@@ -523,6 +533,7 @@ export default {
     this.loadProjectMeta()
     this.loadCast()
     this.checkOutputFiles()
+    this.restoreSources()
     this.updateBadges()
   },
 
@@ -549,6 +560,29 @@ export default {
     },
 
     // ── INGEST ─────────────────────────────────────────────────
+    async restoreSources() {
+      // Rehydrate tiles from disk so a page reload doesn't lose sources
+      // (uploaded or wizard-authored).
+      try {
+        const res = await fetch(`/api/prep/${this.slug}/sources?include_content=1`)
+        if (!res.ok) return
+        const data = await res.json()
+        for (const src of data.sources || []) {
+          const doc = this.docs.find(d => d.id === src.id)
+          if (doc && !doc.loaded) {
+            doc.loaded = true
+            doc.content = src.content || ''
+            doc.filename = src.filename || (src.mode === 'authored'
+              ? 'Authored via interview'
+              : `${src.id}.md`)
+            doc.wordCount = src.word_count || 0
+            doc.mode = src.mode
+          }
+        }
+        this.updateBadges()
+      } catch { /* tiles just start empty */ }
+    },
+
     triggerFileInput(doc) {
       const input = this.$refs['fileInput_' + doc.id]
       if (input) (Array.isArray(input) ? input[0] : input).click()
@@ -567,8 +601,24 @@ export default {
 
     async processFile(file, doc) {
       doc.filename = file.name
-      const text = await file.text()
+      let text
+      if (/\.pdf$/i.test(file.name)) {
+        // Binary formats go through the backend parser — file.text()
+        // silently corrupts PDFs into mojibake.
+        const form = new FormData()
+        form.append('file', file)
+        const res = await fetch(`/api/prep/${this.slug}/extract`, { method: 'POST', body: form })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          doc.filename = `${file.name} — could not extract text`
+          return
+        }
+        text = data.content
+      } else {
+        text = await file.text()
+      }
       doc.content = text
+      doc.mode = 'uploaded'
       // Get word count from backend or locally
       try {
         const res = await fetch(`/api/prep/${this.slug}/parse`, {
@@ -617,8 +667,12 @@ export default {
     },
 
     async saveSourcesToBackend() {
+      // Wizard-authored docs are already on disk with their provenance
+      // header; re-posting them would overwrite the authored marker.
+      const toSave = this.docs.filter(d => d.loaded && d.mode !== 'authored')
+      if (toSave.length === 0) return { status: 'ok', saved: [] }
       const payload = {
-        sources: this.docs.filter(d => d.loaded).map(d => ({
+        sources: toSave.map(d => ({
           id: d.id,
           label: d.label,
           filename: d.filename,
@@ -978,6 +1032,27 @@ export default {
 .section-copy  { font-size: 13px; line-height: 1.6; color: var(--muted-fg); }
 
 /* ── DOC GRID (INGEST) ─────────────────────────────────────── */
+/* ── DOCUMENT WIZARD BANNER ─────────────────────────────────── */
+.wizard-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1.5px solid var(--accent);
+  background: linear-gradient(to right, #FAF3DF, var(--card));
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  margin-bottom: 18px;
+  text-decoration: none;
+  color: var(--foreground);
+  transition: box-shadow .15s ease;
+}
+.wizard-banner:hover { box-shadow: 0 6px 18px -10px rgba(138, 109, 42, .5); }
+.wizard-banner-icon { font-size: 22px; }
+.wizard-banner-text { flex: 1; }
+.wizard-banner-title { font-weight: 600; font-size: 14.5px; }
+.wizard-banner-sub { font-size: 9.5px; letter-spacing: .1em; color: var(--muted-fg); margin-top: 3px; }
+.wizard-banner-cta { font-size: 11px; letter-spacing: .08em; color: #8A6D2A; white-space: nowrap; }
+
 .doc-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

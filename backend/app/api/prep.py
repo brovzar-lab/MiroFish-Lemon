@@ -151,9 +151,6 @@ def save_sources(slug: str):
 
     sources_dir = _project_dir(slug) / "sources"
     sources_dir.mkdir(parents=True, exist_ok=True)
-    # Clear stale sources first
-    for existing in sources_dir.glob("*.md"):
-        existing.unlink()
 
     saved = []
     total_chars = 0
@@ -165,10 +162,11 @@ def save_sources(slug: str):
         # Sanitize id for filename
         safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", sid)[:64]
         path = sources_dir / f"{safe_id}.md"
-        # Header lets the AI know which document is which
+        # Header lets the AI know which document is which. Replaces only the
+        # ids in this payload, so wizard-authored docs survive re-uploads.
         label = src.get("label", sid)
         filename = src.get("filename", "")
-        header = f"# Source: {label}\n# File: {filename}\n# ID: {sid}\n\n---\n\n"
+        header = f"# Source: {label}\n# File: {filename}\n# ID: {sid}\n# Mode: uploaded\n\n---\n\n"
         path.write_text(header + content, encoding="utf-8")
         saved.append({"id": sid, "chars": len(content), "label": label})
         total_chars += len(content)
@@ -179,6 +177,213 @@ def save_sources(slug: str):
         "total_chars": total_chars,
         "sources_dir": str(sources_dir.relative_to(REPO_ROOT)),
     })
+
+
+@prep_bp.route("/<slug>/sources", methods=["GET"])
+def list_sources(slug: str):
+    """
+    List saved source documents (used to rehydrate the INGEST tiles after a
+    page reload). Pass ?include_content=1 to also return the document bodies.
+    """
+    sources_dir = _project_dir(slug) / "sources"
+    include_content = request.args.get("include_content") == "1"
+    out = []
+    if sources_dir.exists():
+        for f in sorted(sources_dir.glob("*.md")):
+            text = f.read_text(encoding="utf-8")
+            mode = "uploaded"
+            m = re.search(r"^# Mode: (\w+)", text, re.MULTILINE)
+            if m:
+                mode = m.group(1)
+            fname = ""
+            m = re.search(r"^# File: (.*)$", text, re.MULTILINE)
+            if m:
+                fname = m.group(1).strip()
+            # Strip the header block for counting/content
+            body = re.sub(r"^(# .*\n)+\n(---\n\n)?", "", text)
+            item = {
+                "id": f.stem,
+                "filename": fname,
+                "mode": mode,
+                "chars": len(body),
+                "word_count": len(body.split()),
+            }
+            if include_content:
+                item["content"] = body
+            out.append(item)
+    return jsonify({"sources": out})
+
+
+@prep_bp.route("/<slug>/extract", methods=["POST"])
+def extract_file_text(slug: str):
+    """
+    Extract text from an uploaded file (multipart form, field 'file').
+    Fixes silent PDF corruption: the browser's file.text() mangles binary
+    formats, so binary files come here and go through the engine's parser.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided (multipart field 'file')"}), 400
+    up = request.files["file"]
+    import tempfile
+    suffix = Path(up.filename or "upload.txt").suffix.lower() or ".txt"
+    from ..utils.file_parser import FileParser
+    if suffix not in FileParser.SUPPORTED_EXTENSIONS:
+        return jsonify({
+            "error": f"Unsupported file type: {suffix}",
+            "supported": sorted(FileParser.SUPPORTED_EXTENSIONS),
+        }), 400
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        up.save(tmp.name)
+        tmp_path = tmp.name
+    try:
+        text = FileParser.extract_text(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+    return jsonify({
+        "status": "ok",
+        "filename": up.filename,
+        "content": text,
+        "char_count": len(text),
+        "word_count": len(text.split()),
+    })
+
+
+# ─── INTERVIEW (document wizard) ─────────────────────────────────────────────
+
+def _interview_engine(slug: str):
+    from ..services.interview_engine import InterviewEngine
+    return InterviewEngine(_project_dir(slug))
+
+
+def _interview_payload(engine, state):
+    nxt = engine.next_question(state)
+    return {
+        "status": state["status"],
+        "next_question": nxt,
+        "progress": engine.progress(state),
+        "characters": state.get("characters", []),
+        "drafts": {k: bool(v) for k, v in state.get("drafts", {}).items()},
+        "draft_texts": state.get("drafts", {}),
+        "approved": state.get("approved", {}),
+        "answered_count": sum(1 for q in state["questions"] if q["answer"] is not None),
+        "total_count": len(state["questions"]),
+        "questions": [
+            {k: q.get(k) for k in ("id", "doc", "text", "example", "answer", "skipped", "optional")}
+            for q in state["questions"]
+        ],
+    }
+
+
+@prep_bp.route("/<slug>/interview", methods=["GET"])
+def get_interview(slug: str):
+    """Current interview state (resumable across sessions)."""
+    engine = _interview_engine(slug)
+    state = engine.load()
+    if not state:
+        return jsonify({"status": "not_started"})
+    return jsonify(_interview_payload(engine, state))
+
+
+@prep_bp.route("/<slug>/interview/start", methods=["POST"])
+def start_interview(slug: str):
+    """
+    Start (or restart) the interview.
+    Body: {uploaded_docs: ["synopsis", ...]} — docs already uploaded, which
+    the interview will skip and treat as complete.
+    """
+    data = request.get_json(silent=True) or {}
+    engine = _interview_engine(slug)
+    state = engine.start(data.get("uploaded_docs", []))
+    return jsonify(_interview_payload(engine, state))
+
+
+@prep_bp.route("/<slug>/interview/answer", methods=["POST"])
+def answer_interview(slug: str):
+    """Body: {question_id, answer} or {question_id, skip: true}."""
+    data = request.get_json(silent=True) or {}
+    qid = data.get("question_id")
+    if not qid:
+        return jsonify({"error": "question_id required"}), 400
+    engine = _interview_engine(slug)
+    state = engine.load()
+    if not state:
+        return jsonify({"error": "Interview not started"}), 400
+    try:
+        state = engine.answer(state, qid, data.get("answer"), skip=bool(data.get("skip")))
+    except KeyError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(_interview_payload(engine, state))
+
+
+@prep_bp.route("/<slug>/interview/synthesize", methods=["POST"])
+def synthesize_interview_doc(slug: str):
+    """
+    Generate the draft for one document from the interview answers.
+    Body: {doc_id}. Uses uploaded sources (if any) as consistency context.
+    """
+    data = request.get_json(silent=True) or {}
+    doc_id = data.get("doc_id")
+    engine = _interview_engine(slug)
+    state = engine.load()
+    if not state:
+        return jsonify({"error": "Interview not started"}), 400
+    if doc_id not in ("bible", "synopsis", "protocol", "seed", "handoff"):
+        return jsonify({"error": f"Unknown doc_id: {doc_id}"}), 400
+    if not engine.ready_to_synthesize(state, doc_id):
+        return jsonify({
+            "error": "Not enough answers yet for this document (need at least 60% of its questions)."
+        }), 400
+
+    # Uploaded sources give the synthesis consistency context
+    sources_text = ""
+    sources_dir = _project_dir(slug) / "sources"
+    if sources_dir.exists():
+        parts = []
+        for f in sorted(sources_dir.glob("*.md")):
+            parts.append(f.read_text(encoding="utf-8"))
+        sources_text = "\n\n---\n\n".join(parts)
+
+    messages = engine.build_synthesis_prompt(state, doc_id, sources_text)
+
+    from ..utils.llm_client import LLMClient, CreditExhaustedException
+    try:
+        client = LLMClient()
+        draft = client.chat(messages=messages, temperature=0.4, max_tokens=8192)
+    except CreditExhaustedException as e:
+        return jsonify({"error": str(e), "error_type": "credits_exhausted"}), 402
+    except Exception as e:
+        return jsonify({"error": f"Draft generation failed: {e}"}), 502
+
+    engine.store_draft(state, doc_id, draft)
+    return jsonify({"status": "ok", "doc_id": doc_id, "draft": draft,
+                    "progress": engine.progress(state)})
+
+
+@prep_bp.route("/<slug>/interview/approve", methods=["POST"])
+def approve_interview_doc(slug: str):
+    """
+    Approve a draft (optionally with edits) and write it into sources/.
+    Body: {doc_id, content?} — content overrides the stored draft when the
+    producer edited it in the review screen.
+    """
+    data = request.get_json(silent=True) or {}
+    doc_id = data.get("doc_id")
+    engine = _interview_engine(slug)
+    state = engine.load()
+    if not state:
+        return jsonify({"error": "Interview not started"}), 400
+    if data.get("content"):
+        engine.store_draft(state, doc_id, data["content"])
+        state = engine.load()
+    try:
+        path = engine.approve(state, doc_id)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"status": "ok", "doc_id": doc_id,
+                    "path": str(Path(path).relative_to(REPO_ROOT)),
+                    "progress": engine.progress(engine.load())})
 
 
 # ─── PHASE 2: CAST ──────────────────────────────────────────────────────────
@@ -985,8 +1190,10 @@ def validate(slug: str):
         "overall": "PASS" if (
             validation.get("failures", 1) == 0 and
             len(pollution) == 0 and
-            upload_chars < 50000 and
-            seed_chars < 5000
+            # Documents must actually exist — an unbuilt project used to PASS
+            # because 0 chars is trivially under every limit.
+            0 < upload_chars < 50000 and
+            0 < seed_chars < 5000
         ) else "FAIL",
     })
 

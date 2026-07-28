@@ -33,6 +33,12 @@ const routes = [
     props: true
   },
   {
+    path: '/project/:slug/interview',
+    name: 'Interview',
+    component: () => import('../views/InterviewView.vue'),
+    props: true
+  },
+  {
     path: '/project/:slug/launch',
     name: 'Launch',
     component: LaunchConfirmView,
