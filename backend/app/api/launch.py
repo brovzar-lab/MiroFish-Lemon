@@ -90,6 +90,13 @@ def launch_simulation(slug: str):
         # Carry the prep package's language so reports come out in it
         project.language = project_language
 
+        # Carry the approved cast so profile generation is bound to it
+        # (cast_policy guarantees mandatory agents, drops excluded/junk)
+        try:
+            project.character_cast = json.loads(cast_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Could not read character_cast.json for {slug}: {e}")
+
         # Update status
         project.status = ProjectStatus.CREATED
 

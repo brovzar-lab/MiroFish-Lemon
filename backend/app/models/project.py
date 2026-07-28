@@ -52,6 +52,10 @@ class Project:
     chunk_overlap: int = 50
     # Report/output language (locale code from locales/languages.json, e.g. 'en', 'es')
     language: Optional[str] = None
+
+    # Approved character cast from the prep studio (character_cast.json content).
+    # When present, profile generation is bound to it via cast_policy.
+    character_cast: Optional[Dict[str, Any]] = None
     
     # 错误信息
     error: Optional[str] = None
@@ -76,6 +80,7 @@ class Project:
             "chunk_size": self.chunk_size,
             "chunk_overlap": self.chunk_overlap,
             "language": self.language,
+            "character_cast": self.character_cast,
             "error": self.error
         }
     
@@ -104,6 +109,7 @@ class Project:
             chunk_size=data.get('chunk_size', 500),
             chunk_overlap=data.get('chunk_overlap', 50),
             language=data.get('language'),
+            character_cast=data.get('character_cast'),
             error=data.get('error')
         )
 

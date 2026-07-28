@@ -230,14 +230,21 @@ class OasisProfileGenerator:
     
     # 个人类型实体（需要生成具体人设）
     INDIVIDUAL_ENTITY_TYPES = [
-        "student", "alumni", "professor", "person", "publicfigure", 
-        "expert", "faculty", "official", "journalist", "activist"
+        "student", "alumni", "professor", "person", "publicfigure",
+        "expert", "faculty", "official", "journalist", "activist",
+        # Film/TV narrative ontologies (Lemon): these types previously fell
+        # through to the generic prompt path and produced weaker personas
+        "character", "familymember", "businessexecutive", "criminaloperator",
+        "investigator", "lawenforcement", "politician", "celebrity",
+        "protagonist", "antagonist",
     ]
-    
+
     # 群体/机构类型实体（需要生成群体代表人设）
     GROUP_ENTITY_TYPES = [
-        "university", "governmentagency", "organization", "ngo", 
-        "mediaoutlet", "company", "institution", "group", "community"
+        "university", "governmentagency", "organization", "ngo",
+        "mediaoutlet", "company", "institution", "group", "community",
+        # Film/TV narrative ontologies (Lemon)
+        "cartel", "faction", "familybusiness", "conglomerate",
     ]
     
     def __init__(
