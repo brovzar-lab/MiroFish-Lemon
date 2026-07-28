@@ -20,6 +20,7 @@ from enum import Enum
 
 from ..config import Config
 from ..utils.llm_client import LLMClient, CreditExhaustedException
+from ..utils.locale import get_language_instruction
 from ..utils.logger import get_logger
 from .zep_tools import (
     ZepToolsService, 
@@ -652,9 +653,9 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
    - 这些引用是模拟预测的核心证据
 
 3. 【语言一致性 - 引用内容必须翻译为报告语言】
-   - 工具返回的内容可能包含英文或中英文混杂的表述
-   - 如果模拟需求和材料原文是中文的，报告必须全部使用中文撰写
-   - 当你引用工具返回的英文或中英混杂内容时，必须将其翻译为流畅的中文后再写入报告
+   - 工具返回的内容可能包含与报告语言不同的表述
+   - 报告必须全部使用本提示末尾语言指令所指定的语言撰写
+   - 当你引用工具返回的其他语言内容时，必须将其翻译为报告语言后再写入
    - 翻译时保持原意不变，确保表述自然通顺
    - 这一规则同时适用于正文和引用块（> 格式）中的内容
 
@@ -674,7 +675,7 @@ SECTION_SYSTEM_PROMPT_TEMPLATE = """\
 - ✅ 章节标题由系统自动添加，你只需撰写纯正文内容
 - ✅ 使用**粗体**、段落分隔、引用、列表来组织内容，但不要用标题
 
-【正确示例】
+【正确示例】（仅示范格式结构；报告语言以本提示末尾的语言指令为准，不要模仿示例的语言）
 ```
 本章节分析了事件的舆论传播态势。通过对模拟数据的深入分析，我们发现...
 
@@ -1056,6 +1057,11 @@ class ReportAgent:
             else:
                 return f"未知工具: {tool_name}。请使用以下工具之一: insight_forge, panorama_search, quick_search"
                 
+        except CreditExhaustedException:
+            # Must propagate so generate_report() can pause + save a resumable
+            # state. Swallowing it here fed the error string to the LLM as a
+            # tool observation and burned iterations on a dead API key.
+            raise
         except Exception as e:
             logger.error(f"工具执行失败: {tool_name}, 错误: {str(e)}")
             return f"工具执行失败: {str(e)}"
@@ -1162,7 +1168,7 @@ class ReportAgent:
         if progress_callback:
             progress_callback("planning", 30, "正在生成报告大纲...")
         
-        system_prompt = PLAN_SYSTEM_PROMPT
+        system_prompt = f"{PLAN_SYSTEM_PROMPT}\n\n{get_language_instruction()}"
         user_prompt = PLAN_USER_PROMPT_TEMPLATE.format(
             simulation_requirement=self.simulation_requirement,
             total_nodes=context.get('graph_statistics', {}).get('total_nodes', 0),
@@ -1258,6 +1264,7 @@ class ReportAgent:
             section_title=section.title,
             tools_description=self._get_tools_description(),
         )
+        system_prompt = f"{system_prompt}\n\n{get_language_instruction()}"
 
         # 构建用户prompt - 每个已完成章节各传入最大4000字
         if previous_sections:
@@ -1804,6 +1811,10 @@ class ReportAgent:
             if self.report_logger:
                 self.report_logger.log_error(paused_msg, "credits_exhausted")
 
+            # Salvage: assemble whatever sections completed so the partial
+            # report is readable and downloadable instead of a 0-byte file.
+            self._assemble_partial(report, report_id)
+
             try:
                 ReportManager.save_report(report)
                 ReportManager.update_progress(
@@ -1823,11 +1834,14 @@ class ReportAgent:
             logger.error(f"报告生成失败: {str(e)}")
             report.status = ReportStatus.FAILED
             report.error = str(e)
-            
+
             # 记录错误日志
             if self.report_logger:
                 self.report_logger.log_error(str(e), "failed")
-            
+
+            # Salvage completed sections into a readable partial report
+            self._assemble_partial(report, report_id)
+
             # 保存失败状态
             try:
                 ReportManager.save_report(report)
@@ -1842,9 +1856,38 @@ class ReportAgent:
             if self.console_logger:
                 self.console_logger.close()
                 self.console_logger = None
-            
+
             return report
-    
+
+    def _assemble_partial(self, report: 'Report', report_id: str) -> None:
+        """Assemble whatever sections completed before a failure.
+
+        Without this, a crashed run leaves markdown_content empty and the
+        download endpoint serves a 0-byte file while finished sections sit
+        on disk unreachable.
+        """
+        try:
+            outline = report.outline
+            if not outline:
+                return
+            sections = ReportManager.get_generated_sections(report_id)
+            if not sections:
+                return
+            content = ReportManager.assemble_full_report(report_id, outline)
+            total = len(outline.sections) if outline.sections else len(sections)
+            notice = (
+                f"> ⚠️ Partial report: {len(sections)}/{total} sections were "
+                "completed before generation stopped.\n\n"
+            )
+            full = notice + content
+            full_path = ReportManager._get_report_markdown_path(report_id)
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(full)
+            report.markdown_content = full
+            logger.info(f"部分报告已组装: {report_id} ({len(sections)}/{total} sections)")
+        except Exception as salvage_err:
+            logger.warning(f"部分报告组装失败: {salvage_err}")
+
     def chat(
         self, 
         message: str,
@@ -1887,6 +1930,7 @@ class ReportAgent:
             report_content=report_content if report_content else "（暂无报告）",
             tools_description=self._get_tools_description(),
         )
+        system_prompt = f"{system_prompt}\n\n{get_language_instruction()}"
 
         # 构建消息
         messages = [{"role": "system", "content": system_prompt}]
