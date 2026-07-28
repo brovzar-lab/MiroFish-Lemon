@@ -59,6 +59,9 @@ class Config:
     REPORT_AGENT_MAX_TOOL_CALLS = int(os.environ.get('REPORT_AGENT_MAX_TOOL_CALLS', '5'))
     REPORT_AGENT_MAX_REFLECTION_ROUNDS = int(os.environ.get('REPORT_AGENT_MAX_REFLECTION_ROUNDS', '2'))
     REPORT_AGENT_TEMPERATURE = float(os.environ.get('REPORT_AGENT_TEMPERATURE', '0.5'))
+    # Per-section output ceiling. The old hardcoded 4096 was why a $450,
+    # 134-round simulation produced a 4-page report.
+    REPORT_AGENT_MAX_TOKENS = int(os.environ.get('REPORT_AGENT_MAX_TOKENS', '8192'))
     
     @classmethod
     def validate(cls) -> list[str]:
