@@ -75,11 +75,13 @@ def create_app(config_class=Config):
     # 注册蓝图
     from .api import graph_bp, simulation_bp, report_bp, prep_bp
     from .api.launch import launch_bp
+    from .api.settings import settings_bp
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
     app.register_blueprint(prep_bp, url_prefix='/api/prep')
     app.register_blueprint(launch_bp)
+    app.register_blueprint(settings_bp)
     
     # 健康检查
     @app.route('/health')
