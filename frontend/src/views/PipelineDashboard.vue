@@ -13,6 +13,15 @@
         </div>
       </div>
       <div class="header-actions">
+        <div class="model-picker" title="AI model used for simulations, reports and the wizard">
+          <span class="model-label mono">MODEL</span>
+          <select class="model-select mono" v-model="currentModel" @change="saveModel">
+            <optgroup v-for="group in modelGroups" :key="group.label" :label="group.label">
+              <option v-for="m in group.models" :key="m.id" :value="m.id">{{ m.id }}</option>
+            </optgroup>
+            <option v-if="modelGroups.length === 0 && currentModel" :value="currentModel">{{ currentModel }}</option>
+          </select>
+        </div>
         <router-link to="/projects" class="reports-link mono" title="Simulation projects and their generated reports">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           REPORTS
@@ -168,6 +177,8 @@ export default {
         language: 'en',
         duration_hours: 168,
       },
+      modelGroups: [],
+      currentModel: '',
     }
   },
 
@@ -182,9 +193,36 @@ export default {
 
   async mounted() {
     await this.loadProjects()
+    this.loadModels()
   },
 
   methods: {
+    async loadModels() {
+      try {
+        const res = await fetch('/api/settings/models')
+        const data = await res.json()
+        this.modelGroups = data.groups || []
+        this.currentModel = data.current || ''
+      } catch { /* picker shows current model only */ }
+    },
+
+    async saveModel() {
+      try {
+        const res = await fetch('/api/settings/model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: this.currentModel }),
+        })
+        if (!res.ok) {
+          console.error('Could not save model selection')
+          await this.loadModels() // revert to what the backend has
+        }
+      } catch (e) {
+        console.error('Network error saving model:', e.message)
+        await this.loadModels()
+      }
+    },
+
     async loadProjects() {
       this.loading = true
       try {
@@ -294,6 +332,28 @@ export default {
 .brand-subtitle { font-size: 12px; color: var(--muted-fg); margin-top: 2px; }
 
 .header-actions { display: flex; align-items: center; gap: 12px; }
+
+.model-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #DDD8CC;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #FFFDF8;
+}
+
+.model-label { font-size: 9px; letter-spacing: .14em; color: #6E685E; }
+
+.model-select {
+  font-size: 11px;
+  border: none;
+  background: transparent;
+  color: #1A1A1A;
+  max-width: 240px;
+  outline: none;
+  cursor: pointer;
+}
 
 .reports-link {
   display: inline-flex;
