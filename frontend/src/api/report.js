@@ -49,3 +49,16 @@ export const getReport = (reportId) => {
 export const chatWithReport = (data) => {
   return requestWithRetry(() => service.post('/api/report/chat', data), 3, 1000)
 }
+
+/**
+ * 下载报告 Markdown 文件（浏览器原生下载，走 Vite /api 代理）
+ * @param {string} reportId
+ */
+export const downloadReport = (reportId) => {
+  const link = document.createElement('a')
+  link.href = `/api/report/${reportId}/download`
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}

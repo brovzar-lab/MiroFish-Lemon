@@ -15,6 +15,7 @@ from ..services.simulation_manager import SimulationManager
 from ..models.project import ProjectManager
 from ..models.task import TaskManager, TaskStatus
 from ..utils.logger import get_logger
+from ..utils.locale import get_locale, set_locale
 
 logger = get_logger('mirofish.api.report')
 
@@ -127,8 +128,14 @@ def generate_report():
             }
         )
         
+        # The report must be written in the project's language. Fall back to the
+        # request locale. Captured HERE because the background thread below has
+        # no request context (this was the cause of Chinese-only reports).
+        report_locale = getattr(project, 'language', None) or get_locale()
+
         # 定义后台任务
         def run_generate():
+            set_locale(report_locale)
             try:
                 task_manager.update_task(
                     task_id,
@@ -397,41 +404,56 @@ def list_reports():
         }), 500
 
 
+def _report_download_name(title: str, report_id: str) -> str:
+    """Human-readable download filename from the report title."""
+    import re
+    cleaned = re.sub(r'[\\/:*?"<>|：＊？＜＞｜\n\r\t]+', ' - ', (title or '').strip())
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip(' -.')
+    return f"{cleaned}.md" if cleaned else f"{report_id}.md"
+
+
 @report_bp.route('/<report_id>/download', methods=['GET'])
 def download_report(report_id: str):
     """
     下载报告（Markdown格式）
-    
+
     返回Markdown文件
     """
     try:
         report = ReportManager.get_report(report_id)
-        
+
         if not report:
             return jsonify({
                 "success": False,
                 "error": f"报告不存在: {report_id}"
             }), 404
-        
+
+        title = report.outline.title if report.outline else ''
+        download_name = _report_download_name(title, report_id)
         md_path = ReportManager._get_report_markdown_path(report_id)
-        
+
         if not os.path.exists(md_path):
-            # 如果MD文件不存在，生成一个临时文件
+            # No assembled file. Never serve an empty attachment.
+            if not report.markdown_content:
+                return jsonify({
+                    "success": False,
+                    "error": "Report has no content yet (no completed sections to download)."
+                }), 404
             import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
                 f.write(report.markdown_content)
                 temp_path = f.name
-            
+
             return send_file(
                 temp_path,
                 as_attachment=True,
-                download_name=f"{report_id}.md"
+                download_name=download_name
             )
-        
+
         return send_file(
             md_path,
             as_attachment=True,
-            download_name=f"{report_id}.md"
+            download_name=download_name
         )
         
     except Exception as e:

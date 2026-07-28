@@ -63,13 +63,15 @@ def launch_simulation(slug: str):
     source_text = upload_doc.read_text(encoding="utf-8")
     seed_text = reality_seed.read_text(encoding="utf-8")
 
-    # Read project meta for friendly name
+    # Read project meta for friendly name and report language
     meta_path = prep / "meta.json"
     project_name = slug.replace("-", " ").title()
+    project_language = None
     if meta_path.exists():
         try:
             meta = json.loads(meta_path.read_text("utf-8"))
             project_name = meta.get("name", project_name)
+            project_language = meta.get("language")
         except (json.JSONDecodeError, KeyError):
             pass
 
@@ -84,6 +86,9 @@ def launch_simulation(slug: str):
 
         # Set the simulation requirement (reality seed)
         project.simulation_requirement = seed_text
+
+        # Carry the prep package's language so reports come out in it
+        project.language = project_language
 
         # Update status
         project.status = ProjectStatus.CREATED

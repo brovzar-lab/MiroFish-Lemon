@@ -145,6 +145,16 @@
             <span>{{ isResuming ? 'Resuming...' : 'Resume Generation' }}</span>
           </button>
 
+          <!-- Export Button - 报告完成或部分完成后均可下载 -->
+          <button v-if="isComplete || isFailed" class="export-btn" @click="downloadReportFile">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>{{ $t('step4.downloadReport') }}</span>
+          </button>
+
           <!-- Credit Exhaustion Warning -->
           <div v-if="isCreditError && !isResuming" class="credit-warning">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -2227,6 +2237,12 @@ const checkInitialReportStatus = async () => {
   }
 }
 
+// Download the report markdown (works for complete and partial reports)
+const downloadReportFile = async () => {
+  const { downloadReport } = await import('../api/report')
+  downloadReport(props.reportId)
+}
+
 // Resume a failed/paused generation
 const resumeGeneration = async () => {
   if (!props.simulationId || isResuming.value) return
@@ -3555,6 +3571,30 @@ watch(() => props.reportId, (newId) => {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Export Button */
+.export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 40px);
+  margin: 8px 20px 0 20px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  border-color: #059669;
+  color: #059669;
+}
 
 /* Credit Warning */
 .credit-warning {
