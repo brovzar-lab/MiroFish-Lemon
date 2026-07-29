@@ -12,7 +12,9 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,
+    // 5202: MiroFish's registered port in ~/.claude/dev-ports.md.
+    // 3000 belongs to LEMON-SCREENPLAY-DASHBOARD (Firebase login tied to it).
+    port: 5202,
     open: true,
     proxy: {
       '/api': {
