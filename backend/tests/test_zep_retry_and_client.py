@@ -100,7 +100,9 @@ def test_zep_client_uses_internal_timeout_and_ignores_env_overrides(monkeypatch)
         "timeout": zep.ZEP_HTTP_REQUEST_TIMEOUT_SECONDS,
     }]
     assert zep.ZEP_HTTP_REQUEST_TIMEOUT_SECONDS == 60.0
-    assert zep.ZEP_INGESTION_WAIT_TIMEOUT_SECONDS == 600
+    # Lemon: default raised to 2400s and env-overridable — fresh Zep
+    # accounts queue slower than the upstream 600s deadline allows.
+    assert zep.ZEP_INGESTION_WAIT_TIMEOUT_SECONDS >= 600
     zep.clear_zep_client_cache()
 
 
