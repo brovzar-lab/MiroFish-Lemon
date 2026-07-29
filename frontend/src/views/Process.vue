@@ -610,11 +610,11 @@ const handleNewProject = async () => {
       // 自动开始图谱构建
       await startBuildGraph()
     } else {
-      error.value = response.error || '本体生成失败'
+      error.value = response.error || 'Ontology generation failed'
     }
   } catch (err) {
     console.error('Handle new project error:', err)
-    error.value = '项目初始化失败: ' + (err.message || '未知错误')
+    error.value = 'Project initialization failed: ' + (err.message || 'unknown error')
   } finally {
     loading.value = false
   }
@@ -677,11 +677,11 @@ const loadProject = async () => {
         await loadGraph(response.data.graph_id)
       }
     } else {
-      error.value = response.error || '加载项目失败'
+      error.value = response.error || 'Failed to load project'
     }
   } catch (err) {
     console.error('Load project error:', err)
-    error.value = '加载项目失败: ' + (err.message || '未知错误')
+    error.value = 'Failed to load project: ' + (err.message || 'unknown error')
   } finally {
     loading.value = false
   }
@@ -712,7 +712,7 @@ const startBuildGraph = async () => {
     // 设置初始进度
     buildProgress.value = {
       progress: 0,
-      message: '正在启动图谱构建...'
+      message: 'Starting graph build...'
     }
     
     const response = await buildGraph({ project_id: currentProjectId.value })

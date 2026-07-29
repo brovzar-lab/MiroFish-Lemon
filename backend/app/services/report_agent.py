@@ -115,7 +115,7 @@ class ReportLogger:
         self.log(
             action="planning_start",
             stage="planning",
-            details={"message": "开始规划报告大纲"}
+            details={"message": "Planning report outline"}
         )
     
     def log_planning_context(self, context: Dict[str, Any]):
@@ -286,7 +286,7 @@ class ReportLogger:
             details={
                 "total_sections": total_sections,
                 "total_time_seconds": round(total_time_seconds, 2),
-                "message": "报告生成完成"
+                "message": "Report generation complete"
             }
         )
     
@@ -1211,7 +1211,7 @@ class ReportAgent:
         Returns:
             ReportOutline: 报告大纲
         """
-        logger.info("开始规划报告大纲...")
+        logger.info("Planning report outline...")
         
         if progress_callback:
             progress_callback("planning", 0, "正在分析模拟需求...")
@@ -1680,7 +1680,7 @@ class ReportAgent:
                 self.console_logger = ReportConsoleLogger(report_id)
                 
                 ReportManager.update_progress(
-                    report_id, "pending", 0, "初始化报告...",
+                    report_id, "pending", 0, "Initializing report...",
                     completed_sections=[]
                 )
                 ReportManager.save_report(report)
@@ -1688,7 +1688,7 @@ class ReportAgent:
                 # 阶段1: 规划大纲
                 report.status = ReportStatus.PLANNING
                 ReportManager.update_progress(
-                    report_id, "planning", 5, "开始规划报告大纲...",
+                    report_id, "planning", 5, "Planning report outline...",
                     completed_sections=[]
                 )
                 
@@ -1696,7 +1696,7 @@ class ReportAgent:
                 self.report_logger.log_planning_start()
                 
                 if progress_callback:
-                    progress_callback("planning", 0, "开始规划报告大纲...")
+                    progress_callback("planning", 0, "Planning report outline...")
                 
                 outline = self.plan_outline(
                     progress_callback=lambda stage, prog, msg: 
@@ -1715,7 +1715,7 @@ class ReportAgent:
                 )
                 ReportManager.save_report(report)
                 
-                logger.info(f"大纲已保存到文件: {report_id}/outline.json")
+                logger.info(f"Outline saved: {report_id}/outline.json")
             else:
                 # 断点续传时，也需要初始化日志模块
                 self.report_logger = ReportLogger(report_id)
@@ -1735,7 +1735,7 @@ class ReportAgent:
                 # 更新进度
                 ReportManager.update_progress(
                     report_id, "generating", base_progress,
-                    f"正在生成章节: {section.title} ({section_num}/{total_sections})",
+                    f"Writing section: {section.title} ({section_num}/{total_sections})",
                     current_section=section.title,
                     completed_sections=completed_section_titles
                 )
@@ -1744,7 +1744,7 @@ class ReportAgent:
                     progress_callback(
                         "generating", 
                         base_progress, 
-                        f"正在生成章节: {section.title} ({section_num}/{total_sections})"
+                        f"Writing section: {section.title} ({section_num}/{total_sections})"
                     )
                 
                 # --- 断点续传：检查该章节文件是否已存在 ---
@@ -1811,17 +1811,17 @@ class ReportAgent:
                 ReportManager.update_progress(
                     report_id, "generating", 
                     base_progress + int(70 / total_sections),
-                    f"章节 {section.title} 已完成",
+                    f"Section complete: {section.title}",
                     current_section=None,
                     completed_sections=completed_section_titles
                 )
             
             # 阶段3: 组装完整报告
             if progress_callback:
-                progress_callback("generating", 95, "正在组装完整报告...")
+                progress_callback("generating", 95, "Assembling full report...")
             
             ReportManager.update_progress(
-                report_id, "generating", 95, "正在组装完整报告...",
+                report_id, "generating", 95, "Assembling full report...",
                 completed_sections=completed_section_titles
             )
             
@@ -1843,14 +1843,14 @@ class ReportAgent:
             # 保存最终报告
             ReportManager.save_report(report)
             ReportManager.update_progress(
-                report_id, "completed", 100, "报告生成完成",
+                report_id, "completed", 100, "Report generation complete",
                 completed_sections=completed_section_titles
             )
             
             if progress_callback:
-                progress_callback("completed", 100, "报告生成完成")
+                progress_callback("completed", 100, "Report generation complete")
             
-            logger.info(f"报告生成完成: {report_id}")
+            logger.info(f"Report complete: {report_id}")
             
             # 关闭控制台日志记录器
             if self.console_logger:
@@ -1893,7 +1893,7 @@ class ReportAgent:
             return report
 
         except Exception as e:
-            logger.error(f"报告生成失败: {str(e)}")
+            logger.error(f"Report generation failed: {str(e)}")
             report.status = ReportStatus.FAILED
             report.error = str(e)
 
@@ -1908,7 +1908,7 @@ class ReportAgent:
             try:
                 ReportManager.save_report(report)
                 ReportManager.update_progress(
-                    report_id, "failed", -1, f"报告生成失败: {str(e)}",
+                    report_id, "failed", -1, f"Report generation failed: {str(e)}",
                     completed_sections=completed_section_titles
                 )
             except Exception:
@@ -1946,7 +1946,7 @@ class ReportAgent:
             with open(full_path, 'w', encoding='utf-8') as f:
                 f.write(full)
             report.markdown_content = full
-            logger.info(f"部分报告已组装: {report_id} ({len(sections)}/{total} sections)")
+            logger.info(f"Partial report assembled: {report_id} ({len(sections)}/{total} sections)")
         except Exception as salvage_err:
             logger.warning(f"部分报告组装失败: {salvage_err}")
 
@@ -2489,7 +2489,7 @@ class ReportManager:
         with open(full_path, 'w', encoding='utf-8') as f:
             f.write(md_content)
         
-        logger.info(f"完整报告已组装: {report_id}")
+        logger.info(f"Full report assembled: {report_id}")
         return md_content
     
     @classmethod
